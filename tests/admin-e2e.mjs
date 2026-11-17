@@ -65,7 +65,8 @@ try{
  await go(1,'movements');
  assert.match(await page.locator('main').innerText(),/PIX fornecedor de serviços/);
  await page.locator('.studio-workspace [data-context="period"]').fill('2026-10');
- assert.match(await page.locator('main').innerText(),/2026-10/);
+ assert.equal(await page.locator('.studio-workspace [data-context="period"]').inputValue(),'2026-10');
+ assert.match(await page.locator('.studio-subheader').innerText(),/10\/2026/);
  await page.locator('.studio-workspace [data-context="period"]').fill('2026-11');
  await page.reload({waitUntil:'networkidle'});
  assert.equal(await page.locator('.studio-workspace [data-context="company"]').inputValue(),original);

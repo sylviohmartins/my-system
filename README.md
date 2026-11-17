@@ -20,7 +20,7 @@
 - **Admin inspirado na implementação aberta do Supabase Studio:** barra vertical compacta de áreas (56 px), painel secundário contextual (232 px), empresa/competência no topo, navegação móvel off-canvas, pesquisa global `Ctrl+K`, alternância de tema e acesso a Configurações no cabeçalho. O código do projeto é independente; foram adaptados conceitos de arquitetura, não componentes proprietários.
 - **Componentes compartilhados** em `ui.mjs`: botões, cabeçalhos, cards, métricas, tabelas, navegação e seletor de empresa/competência. Ícones Lucide em sprite local. Tokens Rose/Onyx em `styles.css`, `admin-shell.css` e `studio-shell.css`.
 - **Sheets laterais**, não modais centralizados; foco, Escape e rodapé de ações fixo. A navegação e o menu também fecham com Escape.
-- Referências verificadas: [Supabase Studio open source](https://github.com/supabase/supabase/tree/master/apps/studio), [código do ProjectLayout](https://github.com/supabase/supabase/blob/master/apps/studio/components/layouts/ProjectLayout/index.tsx) e [documentação de Sidebar](https://supabase.com/design-system/docs/components/sidebar). Especificação em [DESIGN.md](DESIGN.md); plano de QA em [docs/QA-PLAN.md](docs/QA-PLAN.md).
+- Referências verificadas: [Supabase Studio open source](https://github.com/supabase/supabase/tree/master/apps/studio), [código do ProjectLayout](https://github.com/supabase/supabase/blob/master/apps/studio/components/layouts/ProjectLayout/index.tsx) e [documentação de Sidebar](https://supabase.com/design-system/docs/components/sidebar). Especificação em [DESIGN.md](DESIGN.md); **contrato mensurável de alinhamento** em [docs/UI-GRID-CONTRACT.md](docs/UI-GRID-CONTRACT.md); plano de QA em [docs/QA-PLAN.md](docs/QA-PLAN.md).
 
 ## Executar localmente
 Requisitos: navegador atualizado, Python 3 ou servidor HTTP estático e, para executar testes, Node.js 24.
@@ -40,6 +40,7 @@ node tests/smoke.mjs
 node tests/admin-e2e.mjs
 node tests/import-e2e.mjs
 node tests/import-a11y.mjs
+node tests/layout-gates.mjs # alinha o cabeçalho, rail, submenu, breadcrumb e ações
 node tests/design-audit.mjs
 ```
 

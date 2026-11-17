@@ -28,6 +28,7 @@ jobs:
           node tests/admin-e2e.mjs
           node tests/import-e2e.mjs
           node tests/import-a11y.mjs
+          node tests/layout-gates.mjs
           node tests/design-audit.mjs
       - name: Capturar falha
         if: failure()
@@ -38,4 +39,5 @@ jobs:
             smoke-failure.png
             evidence/ui/
             evidence/import/
+            evidence/geometry/
           if-no-files-found: ignore

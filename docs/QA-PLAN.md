@@ -66,3 +66,7 @@ O produto deve permitir escolher empresa e competência, ler e conferir extratos
 
 ## Restrições de segurança
 Esta instalação é **estática e local ao navegador**. Sem autenticação, banco corporativo, backups automáticos e ACL, ela **não está homologada para dados contábeis reais ou documentos pessoais sensíveis**. Não publicar dados de clientes, extratos, PDFs de bancos ou tokens no repositório GitHub. Versões fixas de Lucide, SheetJS e PDF.js são distribuídas com suas licenças, sem dependência de CDN em runtime.
+
+## Gate de geometria de layout (ContaGil Studio)
+
+O fluxo de PR executa `node tests/layout-gates.mjs` antes da auditoria geral. Os 22 estados de largura/tema (320–1920 px) verificam alinhamento entre header, marca, rail, submenu, breadcrumb e conteúdo com tolerância aproximada de 1–1,5 px, além de colunas de ação acessíveis, competência não duplicada, menu recolhido e fechamento móvel. Evidências ficam em `evidence/geometry/`; detalhes e medidas anteriores/posteriores em [UI-GRID-CONTRACT.md](UI-GRID-CONTRACT.md).

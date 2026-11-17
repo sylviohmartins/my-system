@@ -47,7 +47,7 @@ function go(dest){
 const btn=(action,text,kind='')=>UiButton(action,text,kind);
 const card=(title,body,actions='')=>UiCard(title,body,actions);
 function table(headers,rows){return DataTable(headers,rows)}
-function header(title,sub,actions=''){return PageHeader(title,sub,actions,(co()?.name||'Seu escritório')+' / '+period)}
+function header(title,sub,actions=''){return PageHeader(title,sub,actions,'')}
 function layout(content){
  const pending=active?bankRows().filter(m=>!m.entryId).length:0;
  if(!NAV_GROUPS[activeArea])activeArea=0;
@@ -57,7 +57,7 @@ function layout(content){
  const logo='<span class="studio-logo-asset">'
   +'<img class="brand-logo-light" src="./assets/brand/wordmark-light.svg" alt="ContaGil" width="158" height="54">'
   +'<img class="brand-logo-dark" src="./assets/brand/wordmark-dark.svg" alt="ContaGil" width="158" height="54">'
-  +'</span>';
+  +'</span><img class="studio-logo-compact" src="./assets/brand/icon.svg" alt="" aria-hidden="true" width="34" height="34">';
  const mobileButton='<button type="button" class="studio-icon-button studio-mobile-toggle" data-act="mobile-nav" aria-expanded="'+mobileNavOpen+'" aria-controls="studio-navigation" aria-label="'+(mobileNavOpen?'Fechar menu':'Abrir menu')+'">'+Icon('menu')+'</button>';
  const toggle='<button type="button" class="studio-icon-button studio-collapse-toggle" data-act="toggle-sidebar" aria-controls="studio-product-menu" aria-expanded="'+(!navCollapsed)+'" aria-label="'+(navCollapsed?'Expandir navegação':'Recolher navegação')+'" title="'+(navCollapsed?'Expandir navegação':'Recolher navegação')+'">'+Icon(navCollapsed?'panel-left-open':'panel-left-close')+'</button>';
  const areas=NAV_GROUPS.map((area,i)=>{
@@ -80,7 +80,10 @@ function layout(content){
  '<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a>'
  +'<div class="shell studio-shell '+(navCollapsed?'is-collapsed ':'')+(mobileNavOpen?'mobile-nav-open':'')+'">'
  +'<header class="studio-header">'
- +'<div class="studio-brandbar">'+mobileButton+'<button type="button" class="studio-brand-home" data-page="dashboard" aria-label="ContaGil — ir ao painel">'+logo+'</button></div>'
+ +'<div class="studio-brandbar">'+mobileButton
+ +'<button type="button" class="studio-mark-home" data-page="dashboard" aria-label="Ir ao painel do ContaGil" title="ContaGil">'
+ +'<img src="./assets/brand/icon.svg" alt="" aria-hidden="true" width="34" height="34"></button>'
+ +'<button type="button" class="studio-brand-home" data-page="dashboard" aria-label="ContaGil — ir ao painel">'+logo+'</button></div>'
  +'<div class="studio-workspace">'+context+'</div>'
  +'<div class="studio-header-actions">'+help+primaryAction+actions+'</div>'
  +'</header>'
@@ -92,7 +95,7 @@ function layout(content){
  +toggle
  +'</div></nav>'
  +'<div class="studio-product-menu" id="studio-product-menu">'
- +'<div class="studio-product-title"><div><span>CONTAGIL / ESCRITÓRIO</span><h2>'+esc(['Visão geral','Escrituração','Cadastros','Análises'][activeArea])+'</h2></div></div>'
+ +'<div class="studio-product-title"><h2>'+esc(['Visão geral','Escrituração','Cadastros','Análises'][activeArea])+'</h2></div>'
  +'<nav class="studio-items" aria-label="Páginas de '+esc(group.label.toLowerCase())+'">'+products+'</nav>'
  +'<div class="studio-product-footer">'+footer+'</div>'
  +'</div></aside>'

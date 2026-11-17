@@ -349,5 +349,5 @@
 }
 .studio-shell .table-scroll .table-with-actions thead th:last-child {
   z-index: 3;
-  background: var(--surface-subtle);
+  background: var(--table-head-bg);
 }

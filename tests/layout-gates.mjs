@@ -41,6 +41,8 @@ try{
     tableRegion:region?{x:region.x,right:region.right}:null
    };
   });
+  const headerColors=await page.locator('main .table-with-actions thead th').evaluateAll(nodes=>nodes.length?[getComputedStyle(nodes[0]).backgroundColor,getComputedStyle(nodes[nodes.length-1]).backgroundColor]:[]);
+  if(headerColors.length)assert.equal(headerColors[0],headerColors[1],width+'px: coluna de ação com fundo diferente do cabeçalho');
   assert.ok(g.scroll<=g.width+2,width+'px: page overflows');
   near(g.header.bottom,g.subheader.y,width+'px: header overlaps breadcrumb',1);
   near(g.subheader.bottom,g.content.y,width+'px: breadcrumb overlaps content',1);

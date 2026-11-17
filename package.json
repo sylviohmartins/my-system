@@ -8,6 +8,7 @@
     "check": "node --check app.js && node --check core.js && node --check ui.mjs && node --check importers.mjs",
     "verify": "npm run check && npm test",
     "design:scan": "npx --yes impeccable@4.9.2 detect --json .",
+    "layout:verify": "node tests/layout-gates.mjs",
     "design:verify": "npm run verify && npm run design:scan"
   }
 }

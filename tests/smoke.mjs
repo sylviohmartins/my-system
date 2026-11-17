@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.UX_CHROME_PATH?{executablePath:process.env.UX_CHROME_PATH}:{})});
 let page;
 try{
  const context=await browser.newContext({viewport:{width:1280,height:800},acceptDownloads:true,locale:'pt-BR'});

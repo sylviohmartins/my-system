@@ -15,7 +15,7 @@ jobs:
           node-version: '24'
       - name: Instalar Playwright sem alterar dependências do projeto
         run: |
-          npm install --no-save --package-lock=false playwright@1.57.0
+          npm install --no-save --package-lock=false playwright@1.57.0 axe-core@4.11.0
           npx playwright install chromium
       - name: Gerar Excel de exemplo fictício
         run: python3 tests/fixtures/create_xlsx.py
@@ -23,10 +23,13 @@ jobs:
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/contabil-http.log 2>&1 &
           node tests/smoke.mjs
+          node tests/design-audit.mjs
       - name: Capturar falha
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-failure
-          path: smoke-failure.png
+          path: |
+            smoke-failure.png
+            evidence/ui/
           if-no-files-found: ignore

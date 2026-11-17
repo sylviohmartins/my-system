@@ -26,8 +26,13 @@ try {
    if(viewport.name==='desktop')assert.match(await page.locator('h1').first().innerText(),/Organize os fechamentos/);
    await page.locator('[data-act="demo"]').first().click();
    for(const route of paths){
-    if(viewport.width<=900)await page.locator('[data-act="mobile-nav"]').click();
-    await page.locator('[data-page="'+route+'"]').first().click();
+    if(viewport.width<=980)await page.locator('[data-act="mobile-nav"]').click();
+    if(route==='settings')await page.locator('.studio-rail [data-page="settings"]').click();
+    else{
+     const area=route==='dashboard'?0:['import','movements','entries','reconcile'].includes(route)?1:['companies','accounts','parties'].includes(route)?2:3;
+     await page.locator('[data-act="nav-area:'+area+'"]').click();
+     await page.locator('.studio-items [data-page="'+route+'"]').click();
+    }
     await page.waitForTimeout(35);
     const data=await page.evaluate(()=>{
      const root=document.documentElement;
@@ -59,8 +64,9 @@ try {
     if((route==='dashboard'||route==='movements'||route==='reports')&&(viewport.name==='desktop'||viewport.name==='mobile'))
      await page.screenshot({path:'evidence/ui/'+theme+'-'+viewport.name+'-'+route+'.png',fullPage:true});
    }
-   if(viewport.width<=900)await page.locator('[data-act="mobile-nav"]').click();
-   await page.locator('[data-page="movements"]').first().click();
+   if(viewport.width<=980)await page.locator('[data-act="mobile-nav"]').click();
+   await page.locator('[data-act="nav-area:1"]').click();
+   await page.locator('.studio-items [data-page="movements"]').click();
    await page.locator('[data-act^="post:"]').first().click();
    await page.addScriptTag({content:axe.source});
    const a11ySheet=await page.evaluate(async()=>{

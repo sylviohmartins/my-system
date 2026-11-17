@@ -1,4 +1,4 @@
-# ContaGi · Plano de auditoria, homologação e evolução
+# ContaGil · Plano de auditoria, homologação e evolução
 
 ## Critérios de sucesso
 O produto deve permitir escolher empresa e competência, ler e conferir extratos bancários de formatos diferentes, salvar o mapeamento por empresa, registrar partidas dobradas após revisão, reconciliar movimentos e consultar controles e relatórios sem confundir movimentação financeira com fato contábil.

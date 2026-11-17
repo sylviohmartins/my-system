@@ -11,6 +11,8 @@ if(!['light','dark'].includes(theme))theme='light';
 let focusReturnAction=null;
 let navCollapsed=localStorage.getItem(KEY+'.navCollapsed')==='true';
 let mobileNavOpen=false;
+let activeArea=Number(localStorage.getItem(KEY+'.navArea')||0);
+let navSearchQuery='';
 let sheetConfirmFn=null;
 let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,sheet=null,query='',notice='',warning='',stale=false;
 if(!db.companies.some(x=>x.id===active))active=db.companies[0]?.id||'';
@@ -36,59 +38,89 @@ function save(action,detail){
  db.audit=db.audit.slice(0,700);
  try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{db=load();notify('Falha ao salvar: armazenamento cheio ou bloqueado. Verifique o backup.',true);return false}
 }
-function go(dest){page=dest;sheet=null;query='';mobileNavOpen=false;render();window.scrollTo(0,0)}
+function go(dest){
+ page=dest;sheet=null;query='';mobileNavOpen=false;
+ const area=NAV_GROUPS.findIndex(g=>g.items.some(i=>i.id===dest));
+ if(area>=0){activeArea=area;localStorage.setItem(KEY+'.navArea',String(area))}
+ render();window.scrollTo(0,0);
+}
 const btn=(action,text,kind='')=>UiButton(action,text,kind);
 const card=(title,body,actions='')=>UiCard(title,body,actions);
 function table(headers,rows){return DataTable(headers,rows)}
 function header(title,sub,actions=''){return PageHeader(title,sub,actions,(co()?.name||'Seu escritório')+' / '+period)}
 function layout(content){
  const pending=active?bankRows().filter(m=>!m.entryId).length:0;
- const item= NAV_GROUPS.flatMap(g=>g.items.map(i=>({...i,group:g.label}))).find(x=>x.id===page);
- const context=WorkspaceSelector(db.companies,active,period,opt,'sidebar');
- const compact=WorkspaceSelector(db.companies,active,period,opt,'topbar-context');
- const mobileButton='<button type="button" class="icon-btn mobile-nav-button" data-act="mobile-nav" aria-label="Abrir menu" aria-expanded="'+mobileNavOpen+'">'+Icon('menu')+'</button>';
- const sidebarToggle='<button type="button" class="icon-btn sidebar-collapse" data-act="toggle-sidebar" aria-label="'+(navCollapsed?'Expandir menu':'Recolher menu')+'" title="'+(navCollapsed?'Expandir menu':'Recolher menu')+'">'+Icon(navCollapsed?'panel-left-open':'panel-left-close')+'</button>';
- const logo='<span class="brand-mark" aria-hidden="true">Gi</span><div class="brand-label"><strong class="brand-wordmark">Conta<span class="brand-wordmark-accent">Gi</span></strong><small>ESCRITÓRIO CONTÁBIL</small></div>';
- const nav=Nav(NAV_GROUPS,page,pending);
- const foot='<button type="button" class="nav-link nav-footer-link" data-page="settings" '+(page==='settings'?'aria-current="page"':'')+'>'+Icon('settings','nav-icon')+'<span class="nav-label">Configurações e dados</span></button>'
-  +'<button type="button" class="icon-btn footer-theme" data-act="theme-toggle" aria-label="'+(theme==='light'?'Ativar tema escuro':'Ativar tema claro')+'" title="Alternar aparência">'+Icon(theme==='light'?'moon':'sun')+'</button>';
+ if(!NAV_GROUPS[activeArea])activeArea=0;
+ const group=NAV_GROUPS[activeArea];
+ const selected=NAV_GROUPS.flatMap(g=>g.items.map(i=>({...i,group:g.label}))).find(x=>x.id===page);
+ const context=WorkspaceSelector(db.companies,active,period,opt,'studio-context');
+ const logo='<span class="studio-logo-asset">'
+  +'<img class="brand-logo-light" src="./assets/brand/wordmark-light.svg" alt="ContaGil" width="158" height="54">'
+  +'<img class="brand-logo-dark" src="./assets/brand/wordmark-dark.svg" alt="ContaGil" width="158" height="54">'
+  +'</span>';
+ const mobileButton='<button type="button" class="studio-icon-button studio-mobile-toggle" data-act="mobile-nav" aria-expanded="'+mobileNavOpen+'" aria-controls="studio-navigation" aria-label="'+(mobileNavOpen?'Fechar menu':'Abrir menu')+'">'+Icon('menu')+'</button>';
+ const toggle='<button type="button" class="studio-icon-button studio-collapse-toggle" data-act="toggle-sidebar" aria-controls="studio-product-menu" aria-expanded="'+(!navCollapsed)+'" aria-label="'+(navCollapsed?'Expandir navegação':'Recolher navegação')+'" title="'+(navCollapsed?'Expandir navegação':'Recolher navegação')+'">'+Icon(navCollapsed?'panel-left-open':'panel-left-close')+'</button>';
+ const areas=NAV_GROUPS.map((area,i)=>{
+  const ico=area.items[0]?.icon||'circle-dot';
+  const names=['Visão geral','Escrituração','Cadastros','Análises'];
+  return '<button type="button" class="studio-rail-item '+(activeArea===i?'is-current':'')+'" data-act="nav-area:'+i+'" aria-label="'+names[i]+'" title="'+names[i]+'" aria-pressed="'+(activeArea===i)+'">'+Icon(ico)+'</button>';
+ }).join('');
+ const products=Nav([group],page,pending);
+ const footer='<button type="button" data-page="settings" class="studio-menu-settings '+(page==='settings'?'is-current':'')+'">'+Icon('settings')+'<span>Configurações e dados</span></button>'
+  +'<div class="studio-menu-caption"><span class="dot" aria-hidden="true"></span> Dados armazenados neste navegador</div>';
+ const help='<button type="button" class="studio-icon-button studio-search-trigger" data-act="nav-search" aria-label="Pesquisar páginas (Ctrl+K)" title="Pesquisar páginas (Ctrl+K)">'+Icon('search')+'</button>';
+ const actions='<button type="button" class="studio-icon-button studio-theme-trigger" data-act="theme-toggle" aria-label="'+(theme==='light'?'Ativar tema escuro':'Ativar tema claro')+'" title="Alternar aparência">'+Icon(theme==='light'?'moon':'sun')+'</button>'
+  +'<button type="button" class="studio-icon-button studio-settings-trigger" data-page="settings" aria-label="Configurações e dados" title="Configurações">'+Icon('settings')+'</button>';
+ const primaryAction='<button type="button" class="btn primary studio-primary-action" data-act="import-page" aria-label="Importar extrato">'+Icon('plus')+'<span>Importar</span></button>';
+ const breadcrumb='<span class="studio-location">'+esc(selected?.group||group.label)+'<span class="studio-chevron">/</span><b>'+esc(selected?.name||'Configurações')+'</b></span>';
  document.documentElement.dataset.theme=theme;
+ const color=document.querySelector('meta[name="theme-color"]');
+ if(color)color.setAttribute('content',theme==='dark'?'#0d0b0e':'#faf8fa');
  document.getElementById('app').innerHTML=
  '<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a>'
- +'<div class="shell '+(navCollapsed?'is-collapsed ':'')+(mobileNavOpen?'mobile-nav-open':'')+'">'
- +'<aside class="sidebar" aria-label="Menu lateral">'
- +'<div class="sidebar-brandbar"><div class="brand">'+logo+'</div>'+sidebarToggle+'</div>'
- +context
- +'<nav aria-label="Navegação principal" class="sidebar-scroll">'+nav+'</nav>'
- +'<footer class="sidebar-footer">'+foot+'<div class="side-status"><span class="dot" aria-hidden="true"></span><span class="nav-label">Dados neste navegador</span></div></footer>'
- +'</aside>'
- +'<button type="button" class="mobile-nav-backdrop" data-act="mobile-nav-close" aria-label="Fechar menu"></button>'
- +'<div class="work"><header class="topbar">'
- +'<div class="topbar-left">'+mobileButton
- +'<div class="breadcrumbs"><small>'+esc(item?.group||'ESCRITÓRIO')+'</small><strong>'+esc(item?.name||'Configurações')+'</strong></div></div>'
- +'<div class="topbar-right">'+compact
- +'<button type="button" class="btn primary topbar-import" data-act="import-page" aria-label="Importar extrato">'+Icon('plus')+'<span>Importar extrato</span></button>'
- +'</div></header>'
+ +'<div class="shell studio-shell '+(navCollapsed?'is-collapsed ':'')+(mobileNavOpen?'mobile-nav-open':'')+'">'
+ +'<header class="studio-header">'
+ +'<div class="studio-brandbar">'+mobileButton+'<button type="button" class="studio-brand-home" data-page="dashboard" aria-label="ContaGil — ir ao painel">'+logo+'</button></div>'
+ +'<div class="studio-workspace">'+context+'</div>'
+ +'<div class="studio-header-actions">'+help+primaryAction+actions+'</div>'
+ +'</header>'
+ +'<aside class="studio-navigation" id="studio-navigation" aria-label="Navegação do ContaGil">'
+ +'<nav class="studio-rail" aria-label="Áreas de trabalho">'
+ +'<div class="studio-rail-top"><button type="button" class="studio-rail-item studio-nav-close" data-act="mobile-nav-close" aria-label="Fechar menu">'+Icon('x')+'</button>'+areas+'</div>'
+ +'<div class="studio-rail-bottom">'
+ +'<button type="button" class="studio-rail-item '+(page==='settings'?'is-current':'')+'" data-page="settings" aria-label="Configurações" title="Configurações">'+Icon('settings')+'</button>'
+ +toggle
+ +'</div></nav>'
+ +'<div class="studio-product-menu" id="studio-product-menu">'
+ +'<div class="studio-product-title"><div><span>CONTAGIL / ESCRITÓRIO</span><h2>'+esc(['Visão geral','Escrituração','Cadastros','Análises'][activeArea])+'</h2></div></div>'
+ +'<nav class="studio-items" aria-label="Páginas de '+esc(group.label.toLowerCase())+'">'+products+'</nav>'
+ +'<div class="studio-product-footer">'+footer+'</div>'
+ +'</div></aside>'
+ +'<button type="button" class="studio-mobile-backdrop" data-act="mobile-nav-close" aria-label="Fechar menu"></button>'
+ +'<div class="work studio-work"><div class="studio-subheader">'+breadcrumb+'<span class="studio-period-hint">'+esc(period.split('-').reverse().join('/'))+'</span></div>'
  +'<main class="content" id="main-content" tabindex="-1">'
  +(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')
  +(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')
  +content
- +'</main></div></div>'
- +sheetHTML();
+ +'</main></div></div>'+sheetHTML();
  document.body.classList.toggle('has-sheet',!!sheet);
  document.querySelector('.shell')?.toggleAttribute('inert',!!sheet);
  document.querySelector('.skip-link')?.toggleAttribute('inert',!!sheet);
- if(sheet){
-  const dialog=document.querySelector('[role="dialog"]');
-  const target=dialog?.querySelector('form input:not([type="hidden"]), form select, form button, .icon-btn');
-  target?.focus({preventScroll:true});
- }else if(focusReturnAction){
+ if(sheet){const panel=document.querySelector('[role="dialog"]');const target=panel?.querySelector('form input:not([type="hidden"]), .studio-search-input, form select, form button, .icon-btn');target?.focus({preventScroll:true})}
+ else if(focusReturnAction){
   const action=focusReturnAction;focusReturnAction=null;
   const element=[...document.querySelectorAll('[data-act]')].find(el=>el.dataset.act===action);
   (element||document.getElementById('main-content'))?.focus({preventScroll:true});
  }
 }
-function render(){document.title='ContaGi — Lançamentos e conciliação';if(!co()&&!['companies','settings'].includes(page))return layout('<div class="welcome"><div class="symbol">▣</div><h1>Organize os fechamentos de cada empresa.</h1><p>Cadastre seu primeiro cliente para importar extratos, classificar movimentações e gerar lançamentos contábeis.</p>'+btn('new-company','Cadastrar empresa','primary')+' '+btn('demo','Explorar com dados fictícios','subtle')+'</div>');
+function navSearchItems(term=''){
+ const q=norm(term).trim();
+ const matches=NAV_GROUPS.flatMap(g=>g.items.map(i=>({...i,group:g.label})))
+  .filter(item=>!q||norm(item.name+' '+item.group).includes(q));
+ if(!matches.length)return '<p class="studio-no-results">Nenhuma página encontrada.</p>';
+ return matches.map(item=>'<button type="button" data-page="'+item.id+'" class="studio-search-result">'+Icon(item.icon)+'<span><strong>'+esc(item.name)+'</strong><small>'+esc(item.group.toLowerCase())+'</small></span>'+Icon('arrow-up-right')+'</button>').join('');
+}
+function render(){document.title='ContaGil — Lançamentos e conciliação';if(!co()&&!['companies','settings'].includes(page))return layout('<div class="welcome"><div class="studio-welcome-brand"><img src="./assets/brand/wordmark-light.svg" class="brand-logo-light" alt="ContaGil"><img src="./assets/brand/wordmark-dark.svg" class="brand-logo-dark" alt="ContaGil"></div><h1>Organize os fechamentos de cada empresa.</h1><p>Cadastre seu primeiro cliente para importar extratos, classificar movimentações e gerar lançamentos contábeis.</p>'+btn('new-company','Cadastrar empresa','primary')+' '+btn('demo','Explorar com dados fictícios','subtle')+'</div>');
  const views={dashboard:dashboard,companies:companies,accounts:accounts,parties:partiesView,import:importView,movements:movements,entries:entries,reconcile:reconcile,reports:reports,settings:settings};
  layout((views[page]||dashboard)());
 }
@@ -215,6 +247,15 @@ function input(name,label,type='text',value='',required=true){return '<label cla
 function pick(name,label,options,required=true){return '<label class="field"><span>'+label+'</span><select name="'+name+'" '+(required?'required':'')+'>'+options+'</select></label>'}
 function sheetHTML(){
  if(!sheet)return '';
+ if(sheet.kind==='nav-search'){
+  return '<div class="sheet-layer"><button class="sheet-backdrop" type="button" data-act="close" aria-label="Fechar pesquisa"></button>'
+   +'<section class="sheet-panel studio-search-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-heading">'
+   +'<header class="sheet-header"><div class="sheet-heading"><h2 id="sheet-heading">Pesquisar no ContaGil</h2><p class="sheet-description">Encontre rapidamente uma área do escritório.</p></div>'
+   +'<button class="icon-btn" type="button" data-act="close" aria-label="Fechar pesquisa">×</button></header>'
+   +'<div class="sheet-scroll studio-search-content"><label for="nav-search-input">Buscar página</label><input id="nav-search-input" class="studio-search-input" type="search" autocomplete="off" placeholder="Ex.: conciliação, relatórios, empresas...">'
+   +'<div id="nav-search-results">'+navSearchItems(navSearchQuery)+'</div></div>'
+   +'<div class="sheet-actions"><span class="studio-shortcut-hint">Esc para fechar</span></div></section></div>';
+ }
  if(sheet.kind==='confirm'){
   return '<div class="sheet-layer"><button type="button" class="sheet-backdrop" data-act="close" aria-label="Cancelar confirmação"></button><section class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-heading" aria-describedby="sheet-description"><header class="sheet-header"><div class="sheet-heading"><h2 id="sheet-heading">'+esc(sheet.title)+'</h2><p class="sheet-description" id="sheet-description">Confira os detalhes antes de prosseguir.</p></div><button class="icon-btn" type="button" aria-label="Cancelar confirmação" data-act="close">×</button></header><div class="sheet-confirm-content"><p class="sheet-confirm-message">'+esc(sheet.message)+'</p></div><div class="sheet-actions">'+btn('close','Cancelar','outline')+'<button type="button" data-act="confirm-yes" class="btn '+(sheet.destructive?'danger':'primary')+'">Confirmar</button></div></section></div>';
  }
@@ -258,7 +299,7 @@ function exportCSV(kind){
  if(kind==='entries'){head=['Data','Histórico','Documento','Código débito','Código crédito','Valor (R$)'];rows=journal().filter(x=>x.date.startsWith(period)).map(x=>[x.date,x.description,x.document,account(x.debitAccountId)?.code,account(x.creditAccountId)?.code,decimal(x.amount)])}
  if(kind==='titles'){head=['Terceiro','Tipo','Documento','Emissão','Vencimento','Valor (R$)','Saldo (R$)'];rows=scoped('titles').filter(t=>t.date<=monthEnd()).map(t=>[scoped('parties').find(p=>p.id===t.partyId)?.name||'',t.type,t.document,t.date,t.dueDate,decimal(t.amount),decimal(titleOutstanding(t,monthEnd()))])}
  if(kind==='trial'){const r=report(ac(),journal(),monthEnd(),period);head=['Código','Conta','Tipo','Débitos (R$)','Créditos (R$)','Saldo (R$)'];rows=r.rows.map(x=>[x.code,x.name,TYPES[x.type],decimal(x.debit),decimal(x.credit),decimal(x.balance)])}
- exportFile('contagi-'+kind+'-'+period+'.csv',csvExport(head,rows),'text/csv;charset=utf-8');
+ exportFile('contagil-'+kind+'-'+period+'.csv',csvExport(head,rows),'text/csv;charset=utf-8');
 }
 function seed(){
  const id=uid();db.companies.push({id,name:'Empresa Exemplo Ltda. (FICTÍCIA)',document:''});db.accounts.push(...DEFAULTS.map(([code,name,type])=>({id:uid(),companyId:id,code,name,type})));
@@ -362,7 +403,7 @@ function exportInvalid(){
  if(!importing)return;
  const invalid=importPreview().filter(x=>x.errors.length);
  if(!invalid.length)return notify('Nenhuma pendência encontrada.');
- exportFile('contagi-pendencias-'+localToday()+'.csv',
+ exportFile('contagil-pendencias-'+localToday()+'.csv',
   csvExport(['Linha','Data','Histórico ou conteúdo','Valor','Problema','Dados originais'],invalid.map(x=>[x.rowNumber,x.date,x.description,decimal(x.amount),x.errors.join(' | '),JSON.stringify(x.original)])),
   'text/csv;charset=utf-8');
 }
@@ -400,6 +441,15 @@ function restore(file){
  }).catch(e=>notify('Backup inválido: '+e.message,true));
 }
 function onAction(action){
+ if(action.startsWith('nav-area:')){
+  const index=Number(action.split(':')[1]);
+  if(!NAV_GROUPS[index])return;
+  activeArea=index;localStorage.setItem(KEY+'.navArea',String(index));
+  if(window.matchMedia('(min-width: 981px)').matches&&navCollapsed)go(NAV_GROUPS[index].items[0].id);
+  else render();
+  return;
+ }
+ if(action==='nav-search'){navSearchQuery='';sheet={kind:'nav-search'};render();return}
  if(action==='toggle-sidebar'){navCollapsed=!navCollapsed;localStorage.setItem(KEY+'.navCollapsed',String(navCollapsed));render();return}
  if(action==='mobile-nav'){mobileNavOpen=!mobileNavOpen;render();return}
  if(action==='mobile-nav-close'){mobileNavOpen=false;render();return}
@@ -426,7 +476,7 @@ function onAction(action){
  if(action==='apply-pdf-pattern')return updatePdfPattern();
  if(action==='export-invalid')return exportInvalid();
  if(action==='commit-import')return commitImport();
- if(action==='backup')return exportFile('contagi-backup-'+localToday()+'.json',JSON.stringify(db,null,2),'application/json');
+ if(action==='backup')return exportFile('contagil-backup-'+localToday()+'.json',JSON.stringify(db,null,2),'application/json');
  if(action.startsWith('export-'))return exportCSV(action.slice(7));
  if(action.startsWith('select-company:')){active=action.split(':')[1];localStorage.setItem(KEY+'.company',active);go('dashboard');return}
  if(action.startsWith('delete-template:')){
@@ -516,6 +566,12 @@ document.addEventListener('click',e=>{
  e.preventDefault();if(target.dataset.act&&/^(new-|manual-|post:|settle:|edit-account:)/.test(target.dataset.act))focusReturnAction=target.dataset.act;onAction(target.dataset.act);
 });
 document.addEventListener('submit',e=>{if(e.target.id!=='editor')return;e.preventDefault();onSave(e.target)});
+document.addEventListener('input',event=>{
+ if(event.target.id!=='nav-search-input')return;
+ navSearchQuery=event.target.value;
+ const results=document.getElementById('nav-search-results');
+ if(results)results.innerHTML=navSearchItems(navSearchQuery);
+});
 document.addEventListener('change',e=>{
  const t=e.target;
  if(t.dataset.context==='company'||t.id==='activeCompany'){active=t.value;localStorage.setItem(KEY+'.company',active);go('dashboard');return}
@@ -536,6 +592,9 @@ document.addEventListener('change',e=>{
  }
 });
 document.addEventListener('input',e=>{if(e.target.id!=='query')return;const pos=e.target.selectionStart;query=e.target.value;render();const t=document.getElementById('query');t?.focus();t?.setSelectionRange(pos,pos)});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&mobileNavOpen){mobileNavOpen=false;render();return}if(!sheet)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();sheet=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
+document.addEventListener('keydown',event=>{
+ if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();onAction('nav-search');return}
+ if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='b'&&!sheet){event.preventDefault();onAction('toggle-sidebar');return}
+ if(event.key==='Escape'&&mobileNavOpen){mobileNavOpen=false;render();return}if(!sheet)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();sheet=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
 window.addEventListener('storage',e=>{if(e.key===KEY)stale=true});
 render();

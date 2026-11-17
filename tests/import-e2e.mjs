@@ -11,7 +11,11 @@ try{
  page.on('dialog',d=>d.accept());
  await page.goto(site,{waitUntil:'networkidle'});
  await page.locator('[data-act="demo"]').click();
- const go=async route=>page.locator('[data-page="'+route+'"]').first().click();
+ const go=async route=>{
+  const area=route==='import'||route==='movements'?1:route==='companies'?2:route==='reports'?3:0;
+  await page.locator('[data-act="nav-area:'+area+'"]').click();
+  await page.locator('.studio-items [data-page="'+route+'"]').click();
+ };
  const upload=async(path)=>{
   await go('import');
   await page.locator('#bankFile').setInputFiles(path);

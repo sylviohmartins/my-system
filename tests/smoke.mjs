@@ -9,8 +9,8 @@ try{
  page.on('dialog',dialog=>dialog.accept());
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
  assert.match(await page.locator('h1').first().innerText(),/Organize os fechamentos/i);
- assert.match(await page.title(),/^ContaGi/);
- assert.equal(await page.locator('.brand-wordmark').first().innerText(),'ContaGi');
+ assert.match(await page.title(),/^ContaGil/);
+ assert.equal(await page.locator('.studio-logo-asset img.brand-logo-light').getAttribute('alt'),'ContaGil');
  await page.locator('button[data-act="demo"]').first().click();
  assert.equal(await page.locator('button[data-act^="post:"]').count(),1);
  await page.locator('button[data-act^="post:"]').click();
@@ -40,7 +40,8 @@ try{
  await page.waitForTimeout(100);
  assert.match(await page.locator('main').innerText(),/PIX fornecedor X/);
  await page.reload({waitUntil:'networkidle'});
- await page.locator('button[data-page="movements"]').click();
+ await page.locator('[data-act="nav-area:1"]').click();
+ await page.locator('.studio-items button[data-page="movements"]').click();
  assert.match(await page.locator('main').innerText(),/PIX fornecedor X/,'dados persistidos no navegador');
  await page.locator('button[data-page="import"]').click();
  await page.locator('#bankFile').setInputFiles('tests/fixtures/extrato-teste.xlsx');
@@ -49,23 +50,25 @@ try{
  assert.match(await page.locator('main').innerText(),/1 válidas/);
  await page.locator('button[data-act="commit-import"]').click();
  await page.locator('.sheet-panel [data-act="confirm-yes"]').click();
- await page.locator('button[data-page="movements"]').click();
+ await page.locator('[data-act="nav-area:1"]').click();
+ await page.locator('.studio-items button[data-page="movements"]').click();
  assert.match(await page.locator('main').innerText(),/TARIFA TESTE XLSX/,'XLSX importado com sucesso');
 
- await page.locator('button[data-page="settings"]').click();
+ await page.locator('.studio-header-actions [data-page="settings"]').click();
  assert.match(await page.locator('main').innerText(),/Banco X — layout mensal/);
- await page.locator('button[data-page="movements"]').click();
+ await page.locator('[data-act="nav-area:1"]').click();
+ await page.locator('.studio-items button[data-page="movements"]').click();
  const downloadPromise=page.waitForEvent('download');
  await page.locator('button[data-act="export-bank"]').click();
  const download=await downloadPromise;
- assert.match(download.suggestedFilename(),/contagi-bank-/);
+ assert.match(download.suggestedFilename(),/contagil-bank-/);
  await page.evaluate(()=>localStorage.setItem('contabil.local.pages.v1.theme','light'));
  await page.reload({waitUntil:'networkidle'});
- await page.locator('.sidebar-footer [data-act="theme-toggle"]').click();
+ await page.locator('.studio-header-actions [data-act="theme-toggle"]').click();
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
  await page.reload({waitUntil:'networkidle'});
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark','preferência de aparência preservada');
- await page.locator('.sidebar-footer [data-act="theme-toggle"]').click();
+ await page.locator('.studio-header-actions [data-act="theme-toggle"]').click();
  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  console.log('Desktop: lançamentos, importações CSV/XLSX, persistência, exportação, sheets e temas passaram.');
 

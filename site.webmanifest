@@ -1,0 +1,22 @@
+{
+  "name": "ContaGil",
+  "short_name": "ContaGil",
+  "description": "Gestão contábil e conciliação de extratos",
+  "start_url": "/my-system/",
+  "scope": "/my-system/",
+  "display": "standalone",
+  "background_color": "#faf8fa",
+  "theme_color": "#a72a60",
+  "icons": [
+    {
+      "src": "./assets/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

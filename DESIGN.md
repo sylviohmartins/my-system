@@ -1,6 +1,6 @@
 # DESIGN.md — Rose & Onyx · Sistema de design v3
 
-Produto: **ContaGi** · Idioma: português brasileiro · Interfaces: Web desktop, tablet e mobile.
+Produto: **ContaGil** · Idioma: português brasileiro · Interfaces: Web desktop, tablet e mobile.
 
 ## Direção visual
 
@@ -88,3 +88,13 @@ Os tokens base estão em `styles.css`, e `admin-shell.css` define os aliases e s
 - Capturas produzidas em `evidence/ui/` (não publicadas no GitHub Pages).
 
 **Limite da auditoria:** Impeccable e axe-core são diagnósticos automatizados, não comprovantes universais de usabilidade ou conformidade. Revisão visual e testes com usuária real permanecem necessários. Não usar dados contábeis reais no GitHub Pages experimental.
+
+## ContaGil Studio — navegação e identidade (17/11/2026)
+
+- **Marca oficial:** ContaGil. Wordmark caligráfico vetorial em `assets/brand/wordmark-light.svg`, com `Conta` e `l` em preto e `Gi` em rosa; no modo escuro, `Conta` e `l` passam a branco para manter o contraste. Favicon usa o mesmo `Gi` e está disponível em SVG, ICO, PNG, Apple Touch e manifesto.
+- **Referência técnica verificada:** código aberto de [Supabase Studio](https://github.com/supabase/supabase/tree/master/apps/studio), especialmente [ProjectLayout](https://github.com/supabase/supabase/blob/master/apps/studio/components/layouts/ProjectLayout/index.tsx), que separa navegação de produto, menu contextual e conteúdo principal. Padrões complementares: [Supabase Design System — Sidebar](https://supabase.com/design-system/docs/components/sidebar). O ContaGil implementa uma versão original dessas ideias, sem copiar componentes ou usar React sem necessidade.
+- **Estrutura adotada:** cabeçalho superior de 60 px com marca, seletor de empresa, competência, busca global `Ctrl+K`, importação, tema e configurações; rail de 56 px com quatro áreas; menu contextual de 232 px com páginas da área; conteúdo financeiro à direita.
+- **Responsividade:** menu lateral off-canvas abaixo de 981 px, fechamento por botão visível, backdrop e Escape, mantendo empresa/competência acessíveis no cabeçalho. Modo recolhido exibe apenas a rail, sem esconder o contexto global.
+- **Geometria e acessibilidade:** `studio-shell.css` centraliza tokens das superfícies, contraste de elementos auxiliares, espaçamentos e alvos de controle. Testar ambos os temas em 390, 768 e 1440 px e avaliar 72 estados de interface. Controles sem correspondência de comportamento não devem ser adicionados.
+- **Componentes compartilhados:** `ui.mjs` fornece construção comum para navegação, indicadores, botões, cards, tabelas e seletor global; os formulários permanecem exclusivamente em sheets laterais.
+- **Assets:** o arquivo `site.webmanifest` utiliza ícones locais e caminho de início `/my-system/`; `.github/workflows/pages.yml` deve copiar toda a pasta `assets/brand` junto aos recursos do site.

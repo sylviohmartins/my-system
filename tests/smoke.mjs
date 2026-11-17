@@ -20,7 +20,7 @@ try{
  assert.equal(await page.locator('button[data-act^="post:"]').count(),0,'lançamento foi vinculado');
  await page.locator('button[data-page="entries"]').click();
  assert.match(await page.locator('main').innerText(),/Despesa com serviços/);
- assert.match(await page.locator('main').innerText(),/R\$ 250,00/);
+ assert.match(await page.locator('main').innerText(),/R\$\s*250,00/);
 
  await page.locator('button[data-page="import"]').click();
  await page.locator('#bankFile').setInputFiles({
@@ -46,7 +46,8 @@ try{
  assert.match(download.suggestedFilename(),/contabil-bank-/);
  console.log('Desktop: empresa, contabilização, importação CSV, modelo, persistência e exportação passaram.');
 
- const mobile=await context.newPage({viewport:{width:390,height:844}});
+ const mobile=await context.newPage();
+ await mobile.setViewportSize({width:390,height:844});
  await mobile.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
  assert.ok(await mobile.locator('nav button').count()>=8);
  const sizes=await mobile.evaluate(()=>({client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));

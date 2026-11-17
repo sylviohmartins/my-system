@@ -37,6 +37,15 @@ try{
  await page.reload({waitUntil:'networkidle'});
  await page.locator('button[data-page="movements"]').click();
  assert.match(await page.locator('main').innerText(),/PIX fornecedor X/,'dados persistidos no navegador');
+ await page.locator('button[data-page="import"]').click();
+ await page.locator('#bankFile').setInputFiles('tests/fixtures/extrato-teste.xlsx');
+ await page.locator('#headerRow').waitFor({state:'visible',timeout:20000});
+ assert.match(await page.locator('main').innerText(),/TARIFA TESTE XLSX/);
+ assert.match(await page.locator('main').innerText(),/1 válidas/);
+ await page.locator('button[data-act="commit-import"]').click();
+ await page.locator('button[data-page="movements"]').click();
+ assert.match(await page.locator('main').innerText(),/TARIFA TESTE XLSX/,'XLSX importado com sucesso');
+
  await page.locator('button[data-page="settings"]').click();
  assert.match(await page.locator('main').innerText(),/Banco X — layout mensal/);
  await page.locator('button[data-page="movements"]').click();

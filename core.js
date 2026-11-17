@@ -12,7 +12,7 @@ export const DEFAULTS=[
  ['5.1.01','Despesa com serviços','expense'],
  ['5.1.02','Despesas administrativas','expense'],
  ['5.1.03','Tarifas bancárias','expense']];
-export const newDB=()=>({version:1,companies:[],accounts:[],movements:[],entries:[],templates:[],rules:[],audit:[]});
+export const newDB=()=>({version:1,companies:[],accounts:[],parties:[],titles:[],movements:[],entries:[],templates:[],rules:[],audit:[]});
 export const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now();
 export const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export const fmt=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
@@ -120,4 +120,14 @@ export function report(accounts,entries,end,month){
  const revenue=rows.filter(x=>x.type==='revenue').reduce((s,a)=>s+a.monthlyCredit-a.monthlyDebit,0);
  const expense=rows.filter(x=>x.type==='expense').reduce((s,a)=>s+a.monthlyDebit-a.monthlyCredit,0);
  return {rows,assets:sum('asset'),liabilities:sum('liability'),equity:sum('equity'),profit:sum('revenue')-sum('expense'),monthlyProfit:revenue-expense,revenue,expense,totalDebits:rows.reduce((s,a)=>s+a.debit,0),totalCredits:rows.reduce((s,a)=>s+a.credit,0)};
+}
+
+export function titleOutstanding(title,end){
+ if(!title||!dateISO(title.date)||title.date>end)return 0;
+ const paid=(Array.isArray(title.payments)?title.payments:[]).filter(p=>dateISO(p.date)&&p.date<=end).reduce((sum,p)=>sum+p.amount,0);
+ return Math.max(0,title.amount-paid);
+}
+export function controlTotals(titles,end){
+ return {receivable:titles.filter(t=>t.type==='receivable').reduce((sum,t)=>sum+titleOutstanding(t,end),0),
+ payable:titles.filter(t=>t.type==='payable').reduce((sum,t)=>sum+titleOutstanding(t,end),0)};
 }

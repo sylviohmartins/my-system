@@ -347,6 +347,7 @@ tbody td:last-child { white-space: nowrap; }
 
 .sheet-panel .posting { margin: 0; border-radius: 0; }
 body.has-sheet { overflow: hidden; }
+body.has-sheet .skip-link { display: none; }
 .posting { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-4); padding: var(--space-5) var(--space-6); background: var(--posting-bg); }
 .posting div:first-child { grid-column: span 2; }
 .posting small { display: block; margin-bottom: var(--space-1); color: var(--text-muted); font-size: 12px; }

@@ -212,6 +212,7 @@ button, input, select { accent-color: var(--brand); }
   background: var(--surface); border-bottom: 1px solid var(--border-soft);
 }
 .top-right { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; }
+.top-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .top-right label { display: flex; flex-direction: column; gap: var(--space-1); font-size: 12px; font-weight: 700; color: var(--text-secondary); }
 .top-right select, .top-right input {
   min-height: 44px; min-width: 178px; border: 1px solid var(--border);
@@ -378,7 +379,8 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: va
   .top-right { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3); }
   .top-right label { min-width: 0; }
   .top-right select, .top-right input { min-width: 0; width: 100%; }
-  .top-right > .btn { grid-column: span 2; width: fit-content; }
+  .top-actions { grid-column: span 2; display: flex; justify-content: space-between; gap: var(--space-3); }
+  .top-actions > .btn { flex: 0 0 auto; }
   .heading { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
   .heading h1 { font-size: 26px; }
   .heading > div:last-child { width: 100%; }
@@ -441,5 +443,5 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: va
 :root[data-theme="dark"] .sheet-backdrop { background: var(--sheet-backdrop); }
 
 @media (max-width: 650px) {
-  .top-right .theme-toggle { grid-column: span 2; justify-self: start; }
+  .top-right .theme-toggle { grid-column: auto; justify-self: auto; }
 }

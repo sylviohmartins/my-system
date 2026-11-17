@@ -7,6 +7,7 @@ const THEME_KEY=KEY+'.theme';
 let theme=(localStorage.getItem(THEME_KEY)||((window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'));
 if(!['light','dark'].includes(theme))theme='light';
 let focusReturnAction=null;
+let sheetConfirmFn=null;
 let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,sheet=null,query='',notice='',warning='',stale=false;
 if(!db.companies.some(x=>x.id===active))active=db.companies[0]?.id||'';
 const co=()=>db.companies.find(x=>x.id===active);
@@ -20,11 +21,16 @@ const monthEnd=()=>period+'-31';
 const opt=(arr,chosen,placeholder='Selecione')=>'<option value="">'+esc(placeholder)+'</option>'+arr.map(x=>'<option value="'+esc(x[0])+'" '+(x[0]===chosen?'selected':'')+'>'+esc(x[1])+'</option>').join('');
 const accountOptions=(chosen='',exclude='')=>opt(ac().filter(a=>a.id!==exclude).map(a=>[a.id,a.code+' · '+a.name]),chosen,'Selecione a conta');
 const notify=(text,error=false)=>{notice=text;warning=error?'error':'ok';render();setTimeout(()=>{const e=document.getElementById('feedback');if(e)e.remove()},5200)};
+function requestConfirmation(title,message,callback,destructive=false){
+ sheetConfirmFn=callback;
+ sheet={kind:'confirm',title,message,destructive};
+ render();
+}
 function save(action,detail){
- if(stale){alert('Outra aba alterou os dados. Atualize a página para evitar sobrescrita.');return false}
+ if(stale){notify('Outra aba alterou os dados. Atualize a página para evitar sobrescrita.',true);return false}
  if(action)db.audit.unshift({id:uid(),date:new Date().toISOString(),companyId:active,action,detail});
  db.audit=db.audit.slice(0,700);
- try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{db=load();alert('Falha ao salvar: armazenamento cheio ou bloqueado. Verifique o backup.');return false}
+ try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{db=load();notify('Falha ao salvar: armazenamento cheio ou bloqueado. Verifique o backup.',true);return false}
 }
 function go(dest){page=dest;sheet=null;query='';render();window.scrollTo(0,0)}
 const btn=(action,text,kind='')=>'<button type="button" class="btn '+kind+'" data-act="'+action+'">'+text+'</button>';
@@ -139,6 +145,9 @@ function input(name,label,type='text',value='',required=true){return '<label cla
 function pick(name,label,options,required=true){return '<label class="field"><span>'+label+'</span><select name="'+name+'" '+(required?'required':'')+'>'+options+'</select></label>'}
 function sheetHTML(){
  if(!sheet)return '';
+ if(sheet.kind==='confirm'){
+  return '<div class="sheet-layer"><button type="button" class="sheet-backdrop" data-act="close" aria-label="Cancelar confirmação"></button><section class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-heading" aria-describedby="sheet-description"><header class="sheet-header"><div class="sheet-heading"><h2 id="sheet-heading">'+esc(sheet.title)+'</h2><p class="sheet-description" id="sheet-description">Confira os detalhes antes de prosseguir.</p></div><button class="icon-btn" type="button" aria-label="Cancelar confirmação" data-act="close">×</button></header><div class="sheet-confirm-content"><p class="sheet-confirm-message">'+esc(sheet.message)+'</p></div><div class="sheet-actions">'+btn('close','Cancelar','outline')+'<button type="button" data-act="confirm-yes" class="btn '+(sheet.destructive?'danger':'primary')+'">Confirmar</button></div></section></div>';
+ }
  const {kind,id}=sheet,m=bankRows().find(x=>x.id===id),a=ac().find(x=>x.id===id);
  let title='',body='',help='',action=kind;
  if(kind==='company'){title='Cadastrar empresa';body=input('name','Nome da empresa')+input('document','CNPJ ou identificação','text','',false)}
@@ -237,17 +246,18 @@ function saveTemplate(){
 function commitImport(){
  if(!importing||!importing.bankId||!account(importing.bankId))return notify('Selecione a conta bancária.',true);
  const m=importing.mapping;if(m.date===undefined||m.description===undefined||(m.amount===undefined&&(m.deposit===undefined||m.withdrawal===undefined)))return notify('Mapeie Data, Histórico e Valor ou Entrada/Saída.',true);
- const s=importing.sheets[importing.sheet],items=mapMovements(s.rows.slice(importing.header),m,importing.header+1);
+ const source=importing,tab=source.sheets[source.sheet],items=mapMovements(tab.rows.slice(source.header),m,source.header+1);
  const valid=items.filter(x=>!x.errors.length),bad=items.length-valid.length;
  if(!valid.length)return notify('Nenhuma linha válida. Confira o layout.',true);
- if(!confirm('Importar '+valid.length+' movimentações válidas? '+bad+' linhas com erro serão ignoradas. Nenhum lançamento será contabilizado automaticamente.'))return;
- let added=0,duplicates=0;
- for(const x of valid){
-  const sourceId=importing.fingerprint+'|'+s.name+'|'+x.rowNumber;
-  if(bankRows().some(m=>m.sourceId===sourceId)){duplicates++;continue}
-  db.movements.push({id:uid(),companyId:active,date:x.date,description:x.description,document:x.document,party:x.party,amount:x.amount,bankAccountId:importing.bankId,entryId:'',source:importing.filename,sourceId});added++;
- }
- if(save('IMPORT','Importados '+added+' movimentos, '+duplicates+' duplicados, '+bad+' inválidos')){importing=null;go('movements');notify('Importação concluída: '+added+' novos, '+duplicates+' duplicados e '+bad+' inválidos.')}
+ requestConfirmation('Revisar importação',valid.length+' movimentações serão importadas. '+bad+' linhas com erro serão ignoradas. Nenhum lançamento contábil será aprovado automaticamente.',()=>{
+  let added=0,duplicates=0;
+  for(const x of valid){
+   const sourceId=source.fingerprint+'|'+tab.name+'|'+x.rowNumber;
+   if(bankRows().some(m=>m.sourceId===sourceId)){duplicates++;continue}
+   db.movements.push({id:uid(),companyId:active,date:x.date,description:x.description,document:x.document,party:x.party,amount:x.amount,bankAccountId:source.bankId,entryId:'',source:source.filename,sourceId});added++;
+  }
+  if(save('IMPORT','Importados '+added+' movimentos, '+duplicates+' duplicados, '+bad+' inválidos')){importing=null;go('movements');notify('Importação concluída: '+added+' novos, '+duplicates+' duplicados e '+bad+' inválidos.')}
+ });
 }
 function restore(file){
  if(!file)return;
@@ -255,15 +265,17 @@ function restore(file){
  file.text().then(t=>{
   const candidate=JSON.parse(t);
   if(candidate.version!==1||!['companies','accounts','movements','entries','templates','rules','audit'].every(x=>Array.isArray(candidate[x])))throw Error('Formato incompatível');
-  if(!confirm('Substituir todos os dados locais pelos dados deste backup?'))return;
-  const old=db;db=candidate;
-  if(!save('RESTORE','Backup restaurado')){db=old;return}
-  active=db.companies[0]?.id||'';localStorage.setItem(KEY+'.company',active);go('dashboard');notify('Backup restaurado');
+  requestConfirmation('Substituir dados locais','Todos os cadastros, movimentos e lançamentos atuais serão substituídos pelo backup selecionado. Faça backup antes de confirmar.',()=>{
+   const old=db;db={...newDB(),...candidate};
+   if(!save('RESTORE','Backup restaurado')){db=old;return}
+   active=db.companies[0]?.id||'';localStorage.setItem(KEY+'.company',active);go('dashboard');notify('Backup restaurado');
+  },true);
  }).catch(e=>notify('Backup inválido: '+e.message,true));
 }
 function onAction(action){
  if(action==='theme-light'||action==='theme-dark'){theme=action.slice(6);localStorage.setItem(THEME_KEY,theme);render();return}
- if(action==='close'){sheet=null;render();return}
+ if(action==='close'){sheet=null;sheetConfirmFn=null;render();return}
+ if(action==='confirm-yes'){const callback=sheetConfirmFn;sheetConfirmFn=null;sheet=null;render();callback?.();return}
  if(action==='demo')return seed();
  if(action==='new-company'){sheet={kind:'company'};render();return}
  if(action==='new-account'){sheet={kind:'account'};render();return}
@@ -285,17 +297,19 @@ function onAction(action){
  if(action.startsWith('export-'))return exportCSV(action.slice(7));
  if(action.startsWith('select-company:')){active=action.split(':')[1];localStorage.setItem(KEY+'.company',active);go('dashboard');return}
  if(action.startsWith('delete-template:')){
-  const id=action.split(':')[1];if(!confirm('Excluir este modelo de layout?'))return;
-  db.templates=db.templates.filter(x=>x.id!==id||x.companyId!==active);save('DELETE','Layout excluído');render();return;
+  const id=action.split(':')[1];requestConfirmation('Excluir layout','O modelo de colunas será excluído apenas desta empresa. Os movimentos já importados permanecerão.',()=>{
+   db.templates=db.templates.filter(x=>x.id!==id||x.companyId!==active);save('DELETE','Layout excluído');render();
+  },true);return;
  }
  if(action.startsWith('remove-rule:')){
-  const id=action.split(':')[1];if(!confirm('Excluir a regra?'))return;
-  db.rules=db.rules.filter(x=>x.id!==id||x.companyId!==active);save('DELETE','Regra excluída');render();return;
+  const id=action.split(':')[1];requestConfirmation('Excluir regra','A sugestão de classificação será removida. Os lançamentos anteriores não serão alterados.',()=>{
+   db.rules=db.rules.filter(x=>x.id!==id||x.companyId!==active);save('DELETE','Regra excluída');render();
+  },true);return;
  }
  if(action==='clear'){
-  if(!confirm('Excluir todos os dados locais? Faça backup primeiro.'))return;
-  if(!confirm('Confirmação final: a exclusão não pode ser desfeita.'))return;
-  db=newDB();active='';localStorage.removeItem(KEY);localStorage.removeItem(KEY+'.company');go('dashboard');
+  requestConfirmation('Apagar dados locais','Esta ação exclui todos os cadastros, títulos, extratos, lançamentos e regras deste navegador. Não poderá ser desfeita. Exporte o backup JSON antes de continuar.',()=>{
+   db=newDB();active='';localStorage.removeItem(KEY);localStorage.removeItem(KEY+'.company');go('dashboard');notify('Dados locais excluídos.');
+  },true);return;
  }
 }
 function onSave(form){
@@ -322,13 +336,17 @@ function onSave(form){
   const m=bankRows().find(x=>x.id===id),counterpart=account(v('counterpartId'));
   if(!m||m.entryId||!counterpart||m.bankAccountId===counterpart.id)return notify('Selecione uma contrapartida válida.',true);
   const entry=createEntry(m,m.bankAccountId,counterpart.id,active);
-  if(!confirm('Confirmar lançamento?\nD: '+label(entry.debitAccountId)+'\nC: '+label(entry.creditAccountId)+'\nValor: '+fmt(entry.amount)))return;
-  db.entries.push(entry);m.entryId=entry.id;
-  if(fd.get('saveRule')==='on'&&v('ruleTerm')){
-   const term=v('ruleTerm').slice(0,100);const found=scoped('rules').find(r=>norm(r.term)===norm(term));
-   if(found)found.accountId=counterpart.id;
-   else db.rules.push({id:uid(),companyId:active,term,accountId:counterpart.id});
-  }
+  const storeRule=fd.get('saveRule')==='on',ruleTerm=v('ruleTerm').slice(0,100);
+  requestConfirmation('Confirmar lançamento','Débito: '+label(entry.debitAccountId)+'\nCrédito: '+label(entry.creditAccountId)+'\nValor: '+fmt(entry.amount)+'\n\nO lançamento será registrado no diário desta empresa.',()=>{
+   if(m.entryId)return notify('Movimentação já contabilizada.',true);
+   db.entries.push(entry);m.entryId=entry.id;
+   if(storeRule&&ruleTerm){
+    const found=scoped('rules').find(r=>norm(r.term)===norm(ruleTerm));
+    if(found)found.accountId=counterpart.id;
+    else db.rules.push({id:uid(),companyId:active,term:ruleTerm,accountId:counterpart.id});
+   }
+   if(save('POST','Lançamento vinculado ao extrato')){go('movements');notify('Lançamento confirmado e vinculado ao extrato.')}
+  });return;
  }
  if(kind==='manual-entry'){
   const amount=cents(v('amount'));

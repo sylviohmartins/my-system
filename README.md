@@ -10,6 +10,7 @@ O escritório recebe mensalmente planilhas de extratos bancários e transforma a
 - Importação de XLSX e CSV, com mapeamento de colunas, prévia, validação e layouts reutilizáveis por empresa.
 - Importação de PDF com texto em formato simples, em caráter experimental (não OCR).
 - Movimentos importados não geram lançamentos sem aprovação.
+- Cadastro de clientes/fornecedores e títulos a receber/pagar, baixas datadas e confronto auxiliar com contas-controle padrão (1.1.03 e 2.1.01). Baixas auxiliares não alteram automaticamente o razão.
 - Contabilização individual com escolha explícita da conta de contrapartida e débito/crédito calculados conforme o sinal bancário.
 - Regras locais por palavra-chave que **sugerem** contas, nunca aprovam lançamentos sozinhas.
 - Conferência de lançamentos, conciliação por movimento, resumo mensal e balancete simplificado, CSVs e backup/restauração JSON.
@@ -26,3 +27,8 @@ Para uso profissional, migrar a IndexedDB/banco de dados corporativo, implantar 
 
 ## Licença
 MIT. Dependências de importação de arquivos são entregues por CDNs externas com versões fixadas; revisar avisos/licenças e política de rede ao distribuir.
+
+## Ativação do GitHub Pages
+O repositório inclui o workflow .github/workflows/pages.yml que executa os testes antes de publicar os arquivos estáticos. A primeira ativação do Pages pode exigir uma configuração administrativa: Settings → Pages → Build and deployment → Source → GitHub Actions. Depois, execute ou reexecute "Publicar demonstração no GitHub Pages" em Actions. A URL esperada é https://sylviohmartins.github.io/my-system/ **somente após a publicação ser confirmada**.
+
+**Privacidade:** não publique extratos, backups, dados de clientes, CPFs, CNPJs reais ou segredos no repositório público. GitHub Pages hospeda o código da aplicação, não os dados locais de quem a usa.

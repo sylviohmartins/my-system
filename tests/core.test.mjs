@@ -23,3 +23,16 @@ test('composições por terceiro e data de baixa',()=>{
  assert.equal(titleOutstanding(title,'2026-12-31'),0);
  assert.deepEqual(controlTotals([title],'2026-11-30'),{receivable:90000,payable:0});
 });
+
+test('CSV com prefácio e vírgulas nas descrições mantém layout e valores',()=>{
+ const content='Extrato bancário fictício\nGerado em 16/11/2026\nData,Histórico,Valor\n16/11/2026,"Pagamento, oficina","-50,25"\n';
+ const rows=csvParse(content);
+ assert.equal(rows[2][0],'Data');
+ assert.equal(rows[3][1],'Pagamento, oficina');
+ assert.equal(rows[3][2],'-50,25');
+});
+test('datas bancárias com ano de dois dígitos e horário zero',()=>{
+ assert.equal(dateISO('16/11/26'),'2026-11-16');
+ assert.equal(dateISO('16/11/2026 00:00:00'),'2026-11-16');
+ assert.equal(dateISO('31/02/26'),null);
+});

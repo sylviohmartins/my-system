@@ -1,4 +1,6 @@
 import {KEY,TYPES,DEFAULTS,newDB,uid,norm,fmt,decimal,cents,dateISO,csvParse,csvExport,detect,mapMovements,suggestion,createEntry,bankEffect,report,titleOutstanding,controlTotals} from './core.js';
+import {Icon,Button as UiButton,Card as UiCard,MetricCard,PageHeader,DataTable,NAV_GROUPS,Nav,WorkspaceSelector} from './ui.mjs';
+import {inferTableLayout,mappingFromHeaders,normalizeRows,signature,parsePDFLines,extractPdfLines} from './importers.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const localToday=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
@@ -7,6 +9,8 @@ const THEME_KEY=KEY+'.theme';
 let theme=(localStorage.getItem(THEME_KEY)||((window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'));
 if(!['light','dark'].includes(theme))theme='light';
 let focusReturnAction=null;
+let navCollapsed=localStorage.getItem(KEY+'.navCollapsed')==='true';
+let mobileNavOpen=false;
 let sheetConfirmFn=null;
 let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,sheet=null,query='',notice='',warning='',stale=false;
 if(!db.companies.some(x=>x.id===active))active=db.companies[0]?.id||'';
@@ -32,19 +36,57 @@ function save(action,detail){
  db.audit=db.audit.slice(0,700);
  try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{db=load();notify('Falha ao salvar: armazenamento cheio ou bloqueado. Verifique o backup.',true);return false}
 }
-function go(dest){page=dest;sheet=null;query='';render();window.scrollTo(0,0)}
-const btn=(action,text,kind='')=>'<button type="button" class="btn '+kind+'" data-act="'+action+'">'+text+'</button>';
-const card=(title,body,actions='')=>'<section class="card"><div class="card-head"><h2>'+title+'</h2><div>'+actions+'</div></div>'+body+'</section>';
-function table(headers,rows){return '<div class="table-scroll" tabindex="0" role="region" aria-label="Tabela de dados, navegue horizontalmente se necessário"><table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+headers.length+'" class="muted">Nenhum registro para exibir</td></tr>')+'</tbody></table></div>'}
-function header(title,sub,action=''){return '<div class="heading"><div><p class="overline">'+esc(co()?.name||'AMBIENTE LOCAL')+' / '+esc(period)+'</p><h1>'+title+'</h1><p class="muted">'+sub+'</p></div><div class="inline">'+action+'</div></div>'}
+function go(dest){page=dest;sheet=null;query='';mobileNavOpen=false;render();window.scrollTo(0,0)}
+const btn=(action,text,kind='')=>UiButton(action,text,kind);
+const card=(title,body,actions='')=>UiCard(title,body,actions);
+function table(headers,rows){return DataTable(headers,rows)}
+function header(title,sub,actions=''){return PageHeader(title,sub,actions,(co()?.name||'Seu escritório')+' / '+period)}
 function layout(content){
- const links=[['dashboard','Visão geral','◫'],['companies','Empresas','▣'],['accounts','Plano de contas','≡'],['parties','Terceiros e títulos','♧'],['import','Importar extrato','⇧'],['movements','Extratos','⇄'],['entries','Lançamentos','▤'],['reconcile','Conciliação','◎'],['reports','Relatórios','▥'],['settings','Backup e regras','⚙']];
+ const pending=active?bankRows().filter(m=>!m.entryId).length:0;
+ const item= NAV_GROUPS.flatMap(g=>g.items.map(i=>({...i,group:g.label}))).find(x=>x.id===page);
+ const context=WorkspaceSelector(db.companies,active,period,opt,'sidebar');
+ const compact=WorkspaceSelector(db.companies,active,period,opt,'topbar-context');
+ const mobileButton='<button type="button" class="icon-btn mobile-nav-button" data-act="mobile-nav" aria-label="Abrir menu" aria-expanded="'+mobileNavOpen+'">'+Icon('menu')+'</button>';
+ const sidebarToggle='<button type="button" class="icon-btn sidebar-collapse" data-act="toggle-sidebar" aria-label="'+(navCollapsed?'Expandir menu':'Recolher menu')+'" title="'+(navCollapsed?'Expandir menu':'Recolher menu')+'">'+Icon(navCollapsed?'panel-left-open':'panel-left-close')+'</button>';
+ const logo='<span class="brand-mark" aria-hidden="true">Gi</span><div class="brand-label"><strong class="brand-wordmark">Conta<span class="brand-wordmark-accent">Gi</span></strong><small>ESCRITÓRIO CONTÁBIL</small></div>';
+ const nav=Nav(NAV_GROUPS,page,pending);
+ const foot='<button type="button" class="nav-link nav-footer-link" data-page="settings" '+(page==='settings'?'aria-current="page"':'')+'>'+Icon('settings','nav-icon')+'<span class="nav-label">Configurações e dados</span></button>'
+  +'<button type="button" class="icon-btn footer-theme" data-act="theme-toggle" aria-label="'+(theme==='light'?'Ativar tema escuro':'Ativar tema claro')+'" title="Alternar aparência">'+Icon(theme==='light'?'moon':'sun')+'</button>';
  document.documentElement.dataset.theme=theme;
- document.getElementById('app').innerHTML='<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a><div class="shell"><aside class="sidebar" aria-label="Menu lateral"><div class="brand"><span class="brand-mark" aria-hidden="true">Gi</span><div><strong class="brand-wordmark">Conta<span class="brand-wordmark-accent">Gi</span></strong><small>GESTÃO CONTÁBIL</small></div></div><div class="nav-heading">ESCRITÓRIO</div><nav aria-label="Navegação principal">'+links.map(([id,name,symbol])=>'<button type="button" class="nav-link '+(page===id?'active':'')+'" '+(page===id?'aria-current="page"':'')+' data-page="'+id+'"><span class="nav-icon" aria-hidden="true">'+symbol+'</span>'+name+'</button>').join('')+'</nav><div class="side-foot"><span class="dot" aria-hidden="true"></span> Seus dados ficam neste navegador</div></aside><div class="work"><header class="topbar"><div class="mobile-brand brand-wordmark">Conta<span class="brand-wordmark-accent">Gi</span></div><div class="top-right"><label>Empresa <select id="activeCompany">'+opt(db.companies.map(x=>[x.id,x.name]),active,'Sem empresa')+'</select></label><label>Competência <input id="month" type="month" value="'+esc(period)+'"></label><div class="top-actions"><div class="theme-toggle" role="group" aria-label="Aparência"><button type="button" data-act="theme-light" aria-pressed="'+(theme==='light')+'">Claro</button><button type="button" data-act="theme-dark" aria-pressed="'+(theme==='dark')+'">Escuro</button></div><button type="button" class="btn subtle" data-act="backup">Backup JSON</button></div></div></header><main class="content" id="main-content" tabindex="-1">'+(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')+(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')+content+'<footer>Rotinas contábeis com revisão e conferência profissional. <span>Dados locais, sem sincronização.</span></footer></main></div></div>'+sheetHTML();
+ document.getElementById('app').innerHTML=
+ '<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a>'
+ +'<div class="shell '+(navCollapsed?'is-collapsed ':'')+(mobileNavOpen?'mobile-nav-open':'')+'">'
+ +'<aside class="sidebar" aria-label="Menu lateral">'
+ +'<div class="sidebar-brandbar"><div class="brand">'+logo+'</div>'+sidebarToggle+'</div>'
+ +context
+ +'<nav aria-label="Navegação principal" class="sidebar-scroll">'+nav+'</nav>'
+ +'<footer class="sidebar-footer">'+foot+'<div class="side-status"><span class="dot" aria-hidden="true"></span><span class="nav-label">Dados neste navegador</span></div></footer>'
+ +'</aside>'
+ +'<button type="button" class="mobile-nav-backdrop" data-act="mobile-nav-close" aria-label="Fechar menu"></button>'
+ +'<div class="work"><header class="topbar">'
+ +'<div class="topbar-left">'+mobileButton
+ +'<div class="breadcrumbs"><small>'+esc(item?.group||'ESCRITÓRIO')+'</small><strong>'+esc(item?.name||'Configurações')+'</strong></div></div>'
+ +'<div class="topbar-right">'+compact
+ +'<button type="button" class="btn primary topbar-import" data-act="import-page" aria-label="Importar extrato">'+Icon('plus')+'<span>Importar extrato</span></button>'
+ +'</div></header>'
+ +'<main class="content" id="main-content" tabindex="-1">'
+ +(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')
+ +(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')
+ +content
+ +'</main></div></div>'
+ +sheetHTML();
  document.body.classList.toggle('has-sheet',!!sheet);
  document.querySelector('.shell')?.toggleAttribute('inert',!!sheet);
  document.querySelector('.skip-link')?.toggleAttribute('inert',!!sheet);
- if(sheet){const dialog=document.querySelector('[role="dialog"]');const target=dialog?.querySelector('form input:not([type="hidden"]), form select, form button, .icon-btn');target?.focus({preventScroll:true});}else if(focusReturnAction){const action=focusReturnAction;focusReturnAction=null;const element=[...document.querySelectorAll('[data-act]')].find(el=>el.dataset.act===action);(element||document.getElementById('main-content'))?.focus({preventScroll:true});}
+ if(sheet){
+  const dialog=document.querySelector('[role="dialog"]');
+  const target=dialog?.querySelector('form input:not([type="hidden"]), form select, form button, .icon-btn');
+  target?.focus({preventScroll:true});
+ }else if(focusReturnAction){
+  const action=focusReturnAction;focusReturnAction=null;
+  const element=[...document.querySelectorAll('[data-act]')].find(el=>el.dataset.act===action);
+  (element||document.getElementById('main-content'))?.focus({preventScroll:true});
+ }
 }
 function render(){document.title='ContaGi — Lançamentos e conciliação';if(!co()&&!['companies','settings'].includes(page))return layout('<div class="welcome"><div class="symbol">▣</div><h1>Organize os fechamentos de cada empresa.</h1><p>Cadastre seu primeiro cliente para importar extratos, classificar movimentações e gerar lançamentos contábeis.</p>'+btn('new-company','Cadastrar empresa','primary')+' '+btn('demo','Explorar com dados fictícios','subtle')+'</div>');
  const views={dashboard:dashboard,companies:companies,accounts:accounts,parties:partiesView,import:importView,movements:movements,entries:entries,reconcile:reconcile,reports:reports,settings:settings};
@@ -53,10 +95,10 @@ function render(){document.title='ContaGi — Lançamentos e conciliação';if(!
 function dashboard(){
  const m=bankRows().filter(x=>x.date.startsWith(period)),posted=m.filter(x=>x.entryId),pending=m.filter(x=>!x.entryId),entries=journal().filter(x=>x.date.startsWith(period));
  const totalIn=m.filter(x=>x.amount>0).reduce((s,x)=>s+x.amount,0),totalOut=m.filter(x=>x.amount<0).reduce((s,x)=>s-x.amount,0);
- return header('Visão geral','Controle mensal de extratos e lançamentos, sem escrituração automática.',btn('import-page','Importar Excel','primary'))
- +'<div class="metrics">'+[['Movimentações',m.length,'Extratos importados'],['A contabilizar',pending.length,'Requer classificação'],['Contabilizados',posted.length,'Lançamentos vinculados'],['Entradas no banco',fmt(totalIn),'Total mensal'],['Saídas do banco',fmt(totalOut),'Total mensal']].map(([t,v,s])=>'<div class="metric"><span>'+t+'</span><strong>'+v+'</strong><small>'+s+'</small></div>').join('')+'</div>'
- +'<div class="cols">'+card('Seu fluxo de trabalho','<div class="steps"><div><b>01</b><strong>Receba o extrato</strong><span>CSV ou Excel do cliente</span></div><div><b>02</b><strong>Revise as colunas</strong><span>Layout salvo por empresa</span></div><div><b>03</b><strong>Classifique as contas</strong><span>Débito e crédito por operação</span></div><div><b>04</b><strong>Concilie e exporte</strong><span>Relatórios e CSV revisáveis</span></div></div>')
- +card('Prioridades deste mês','<div class="summaryline"><span>Movimentações sem lançamento</span><strong>'+pending.length+'</strong></div><div class="summaryline"><span>Lançamentos não vinculados</span><strong>'+entries.filter(x=>!x.movementId).length+'</strong></div><div class="summaryline"><span>Modelos cadastrados</span><strong>'+scoped('templates').length+'</strong></div><div class="section">'+btn('movements-page','Analisar pendências','outline')+'</div>')+'</div>';
+ return header('Visão geral','Controle mensal de extratos e lançamentos, sem escrituração automática.')
+ +'<div class="metrics">'+[['Movimentações',m.length,'Extratos importados'],['A contabilizar',pending.length,'Requer classificação'],['Contabilizados',posted.length,'Lançamentos vinculados'],['Entradas no banco',fmt(totalIn),'Total mensal'],['Saídas do banco',fmt(totalOut),'Total mensal']].map(([t,v,s])=>MetricCard(t,v,s)).join('')+'</div>'
+ +'<div class="cols">'+card('Seu fluxo de trabalho','<div class="steps"><div><b>01</b><strong>Receba o extrato</strong><span>Excel, CSV ou PDF do cliente</span></div><div><b>02</b><strong>Revise as colunas</strong><span>Layout salvo por empresa</span></div><div><b>03</b><strong>Classifique as contas</strong><span>Débito e crédito por operação</span></div><div><b>04</b><strong>Concilie e exporte</strong><span>Relatórios e CSV revisáveis</span></div></div>')
+ +card('Prioridades deste mês','<div class="summaryline"><span>Movimentações sem lançamento</span><strong>'+pending.length+'</strong></div><div class="summaryline"><span>Lançamentos não vinculados</span><strong>'+entries.filter(x=>!x.movementId).length+'</strong></div><div class="summaryline"><span>Modelos cadastrados</span><strong>'+scoped('templates').length+'</strong></div>',btn('movements-page','Analisar pendências','outline'))+'</div>';
 }
 function companies(){
  return header('Empresas','Cada cliente do escritório possui seu próprio plano de contas, layouts e dados.',btn('new-company','Nova empresa','primary'))
@@ -66,18 +108,46 @@ function accounts(){
  return header('Plano de contas','Códigos contábeis usados para classificar entradas e saídas; confira os códigos oficiais.',btn('new-account','Nova conta','primary')+' '+btn('export-accounts','Exportar CSV','outline'))
  +card('Contas da empresa',table(['Código','Conta contábil','Grupo','Ações'],ac().sort((a,b)=>a.code.localeCompare(b.code,'pt-BR',{numeric:true})).map(a=>'<tr><td><span class="mono">'+esc(a.code)+'</span></td><td>'+esc(a.name)+'</td><td>'+esc(TYPES[a.type])+'</td><td>'+btn('edit-account:'+a.id,'Editar','outline small')+'</td></tr>').join('')));
 }
+function importPreview(){
+ if(!importing)return [];
+ const current=importing.sheets[importing.sheet];
+ return normalizeRows(current.rows.slice(importing.header),importing.mapping,importing.header+1);
+}
 function importView(){
- let html=header('Importar extrato','Mapeie o arquivo do banco uma vez e reutilize o layout da empresa nos próximos meses.');
- html+='<div class="card pad"><div class="flow"><span class="step active">1. Arquivo</span><span class="step '+(importing?'active':'')+'">2. Mapeamento</span><span class="step '+(importing?'active':'')+'">3. Conferência</span></div><div class="upload"><strong>Arraste ou selecione o arquivo de extrato</strong><p>Excel .xlsx, CSV ou PDF textual (experimental) · até 10 MB · sem envio a servidor</p><label class="btn primary">Selecionar arquivo<input id="bankFile" type="file" accept=".xlsx,.csv,.pdf" hidden></label></div></div>';
- if(!importing)return html+card('Layouts salvos',scoped('templates').length?scoped('templates').map(t=>'<div class="summaryline"><span><b>'+esc(t.name)+'</b><small class="muted"> · '+esc(t.sheet)+'</small></span>'+btn('delete-template:'+t.id,'Excluir','ghost small')+'</div>').join(''):'<div class="pad muted">Nenhum modelo salvo. O primeiro mapeamento pode ser reutilizado depois.</div>');
- const s=importing.sheets[importing.sheet],headers=s.rows[importing.header-1]||[],preview=mapMovements(s.rows.slice(importing.header),importing.mapping,importing.header+1);
- const fieldNames={date:'Data *',description:'Histórico *',amount:'Valor com sinal',deposit:'Entradas',withdrawal:'Saídas',document:'Documento',party:'Favorecido / cliente'};
- const selects=Object.entries(fieldNames).map(([key,text])=>'<label class="field"><span>'+text+'</span><select data-map="'+key+'">'+opt(headers.map((v,i)=>[String(i),String.fromCharCode(65+i%26)+' · '+String(v).slice(0,45)]),importing.mapping[key]===undefined?'':String(importing.mapping[key]),'Não utilizado')+'</select></label>').join('');
- html+='<section class="card pad"><div class="form-layout"><label class="field"><span>Aba do Excel</span><select id="sheet">'+opt(importing.sheets.map((s,i)=>[String(i),s.name]),String(importing.sheet),'Selecione')+'</select></label><label class="field"><span>Linha do cabeçalho</span><input type="number" id="headerRow" min="1" max="40" value="'+importing.header+'"></label><label class="field"><span>Conta bancária</span><select id="bankAccount">'+accountOptions(importing.bankId)+'</select></label><label class="field"><span>Modelo de importação</span><select id="template">'+opt(scoped('templates').map(t=>[t.id,t.name]),importing.templateId||'','Detectar automaticamente')+'</select></label></div><div class="separator"></div><h2>Correspondência das colunas</h2><p class="muted">Escolha Data e Histórico. Informe Valor com sinal, ou Entradas e Saídas em colunas separadas.</p><div class="form-layout">'+selects+'</div><div class="form-layout form-bottom"><label class="field"><span>Nome do layout</span><input id="templateName" value="'+esc(importing.templateName||'')+'" placeholder="Ex.: Banco X · extrato mensal"></label><div class="inline end">'+btn('save-template','Salvar layout','outline')+'</div></div></section>';
- const valid=preview.filter(x=>!x.errors.length),errors=preview.filter(x=>x.errors.length);
- html+=card('Prévia de importação — '+preview.length+' linhas', '<div class="preview-head"><span class="pill good">'+valid.length+' válidas</span><span class="pill warn">'+errors.length+' com pendências</span><span class="muted">Arquivo: '+esc(importing.filename)+'</span></div>'
- +table(['Linha','Data','Histórico','Valor','Status'],preview.slice(0,60).map(x=>'<tr><td>'+x.rowNumber+'</td><td>'+esc(x.date||'—')+'</td><td>'+esc(x.description)+'</td><td class="'+(x.amount<0?'negative':'positive')+'">'+fmt(x.amount)+'</td><td>'+(x.errors.length?'<span class="pill warn">'+esc(x.errors.join(', '))+'</span>':'<span class="pill good">Válida</span>')+'</td></tr>').join(''))
- +'<div class="actions">'+btn('commit-import','Importar '+valid.length+' linhas válidas','primary')+' '+btn('cancel-import','Cancelar','outline')+'</div>');
+ let html=header('Importar extratos','Converta arquivos com estruturas diferentes em movimentos bancários padronizados, sem contabilização automática.');
+ html+='<section class="card pad import-start"><div class="flow"><span class="step active">01 · Arquivo</span><span class="step '+(importing?'active':'')+'">02 · Layout</span><span class="step '+(importing?'active':'')+'">03 · Revisão</span></div>'
+  +'<div class="upload">'+Icon('cloud-upload')+'<h2>Selecione um extrato do cliente</h2><p>Excel XLSX/XLS, CSV/TSV ou PDF com texto selecionável · máximo 10 MB</p><label class="file-pick"><input class="file-pick-input" id="bankFile" type="file" accept=".xlsx,.xls,.csv,.tsv,.pdf" aria-label="Escolher arquivo de extrato"><span class="btn primary">Escolher arquivo</span></label></div></section>';
+ if(!importing)return html+card('Layouts por empresa',
+  scoped('templates').length?scoped('templates').map(t=>'<div class="summaryline"><span><b>'+esc(t.name)+'</b><small class="muted"> · '+esc(t.kind?.toUpperCase()||'PLANILHA')+' · '+esc(t.sheet||'')+'</small></span>'+btn('delete-template:'+t.id,'Excluir','ghost small')+'</div>').join('')
+  :'<p class="pad muted">Nenhum layout salvo. Faça a primeira importação, mapeie os campos e salve o modelo para os próximos meses.</p>');
+ const source=importing.sheets[importing.sheet];
+ const maxColumns=Math.max(...source.rows.slice(0,Math.max(3,importing.header+2)).map(r=>r?.length||0),3);
+ const headers=importing.header>0?(source.rows[importing.header-1]||[]):Array.from({length:maxColumns},(_,i)=>'Coluna '+(i+1));
+ const preview=importPreview(),ok=preview.filter(x=>x.errors.length===0),failed=preview.filter(x=>x.errors.length>0);
+ const fields={date:'Data *',description:'Histórico *',amount:'Valor com sinal',deposit:'Crédito / entrada',withdrawal:'Débito / saída',sign:'Indicador D/C',document:'Documento',party:'Favorecido / origem'};
+ const selection=Object.entries(fields).map(([key,label])=>'<label class="field"><span>'+label+'</span><select data-map="'+key+'" aria-label="Mapear '+label+'">'
+  +opt(Array.from({length:maxColumns},(_,i)=>[String(i),(headers[i]||('Coluna '+(i+1))).toString().slice(0,55)]),importing.mapping[key]===undefined?'':String(importing.mapping[key]),'Não utilizado')
+  +'</select></label>').join('');
+ const confidence=Math.round((importing.confidence||0)*100);
+ html+='<section class="card pad"><div class="import-panel-heading"><h2>Mapeamento do arquivo</h2><span class="pill '+(confidence>=75?'good':'warn')+'">Sugestão: '+confidence+'%</span></div>'
+  +'<div class="form-layout"><label class="field"><span>Aba ou origem</span><select id="sheet">'+opt(importing.sheets.map((x,i)=>[String(i),x.name]),String(importing.sheet),'Selecione')+'</select></label>'
+  +'<label class="field"><span>Linha do cabeçalho (0 = sem cabeçalho)</span><input type="number" id="headerRow" min="0" max="40" value="'+importing.header+'"></label>'
+  +'<label class="field"><span>Conta bancária no plano de contas</span><select id="bankAccount">'+accountOptions(importing.bankId)+'</select></label>'
+  +'<label class="field"><span>Reutilizar layout salvo</span><select id="template">'+opt(scoped('templates').map(t=>[t.id,t.name]),importing.templateId||'','Novo mapeamento')+'</select></label></div>'
+  +'<div class="separator"></div><h2>Campos do sistema</h2><p class="muted">Escolha data, histórico e valor com sinal, ou as colunas de entrada e saída. Confira cada sugestão.</p>'
+  +'<div class="form-layout import-fields">'+selection+'</div>';
+ if(importing.kind==='pdf'){
+  html+='<div class="pdf-builder"><h2>Layout do PDF por expressão regular</h2><p class="muted">Use grupos nomeados <code>(?&lt;date&gt;...)</code>, <code>(?&lt;description&gt;...)</code> e <code>(?&lt;amount&gt;...)</code>. Deixe em branco para detecção padrão.</p>'
+   +'<label class="field"><span>Expressão do layout (opcional)</span><textarea id="pdfPattern" rows="3" spellcheck="false" placeholder="(?&lt;date&gt;\\d{2}/\\d{2}/\\d{4})\\s+(?&lt;description&gt;.+?)\\s+(?&lt;amount&gt;-?[\\d.,]+)">'+esc(importing.pdfPattern||'')+'</textarea></label>'
+   +'<div class="import-pdf-actions">'+btn('apply-pdf-pattern','Testar extração','outline')+'<span class="muted">'+(importing.pdfResult?.recognized||0)+' linhas reconhecidas; '+(importing.pdfResult?.unrecognized||0)+' exigem revisão</span></div>'
+   +'<details class="raw-excerpt"><summary>Visualizar texto bruto do PDF</summary>'+table(['Página','Linha extraída'],(importing.rawLines||[]).slice(0,25).map(l=>'<tr><td>'+l.page+'</td><td>'+esc(l.text)+'</td></tr>').join(''))+'</details></div>';
+ }
+ html+='<div class="form-layout form-bottom"><label class="field"><span>Nome do layout reutilizável</span><input id="templateName" value="'+esc(importing.templateName||'')+'" placeholder="Ex.: Cliente A · Banco X · Mensal"></label><div class="inline end">'+btn('save-template','Salvar layout','outline')+'</div></div></section>';
+ html+=card('Conferência dos dados · '+preview.length+' linhas',
+  '<div class="preview-head"><span class="pill good">'+ok.length+' válidas</span><span class="pill warn">'+failed.length+' pendentes</span><span class="muted">Arquivo: '+esc(importing.filename)+'</span></div>'
+  +table(['Linha','Data','Histórico extraído','Valor','Validação'],preview.slice(0,80).map(x=>'<tr><td>'+x.rowNumber+'</td><td>'+esc(x.date||'—')+'</td><td>'+esc(x.description)+'</td><td class="'+(x.amount<0?'negative':'positive')+'">'+fmt(x.amount)+'</td><td>'+(x.errors.length?'<span class="pill warn">'+esc(x.errors.join(', '))+'</span>':'<span class="pill good">Pronto</span>')+'</td></tr>').join(''))
+  +(preview.length>80?'<p class="help">Exibindo as primeiras 80 linhas de '+preview.length+'. Todas as linhas são validadas e incluídas no relatório de importação.</p>':''),
+  btn('cancel-import','Descartar','outline')+(failed.length?btn('export-invalid','Baixar pendências','outline'):'')+btn('commit-import','Importar '+ok.length+' linhas','primary'));
  return html;
 }
 function movements(){
@@ -199,64 +269,121 @@ function seed(){
 }
 async function readFile(file){
  if(!file||!co())return;
- if(file.size>10_000_000){notify('Arquivo maior que 10 MB.',true);return}
+ if(file.size===0){notify('O arquivo está vazio.',true);return}
+ if(file.size>10_000_000){notify('Arquivo acima do limite de 10 MB.',true);return}
  try{
-  let sheets=[],fingerprint='';const bytes=await file.arrayBuffer();
-  if(globalThis.crypto?.subtle){const b=await crypto.subtle.digest('SHA-256',bytes);fingerprint=Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}
-  else fingerprint=file.name+'-'+file.size+'-'+file.lastModified;
-  if(/\.csv$/i.test(file.name)){
-    let source;try{source=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{source=new TextDecoder('windows-1252').decode(bytes)}
-    sheets=[{name:'CSV',rows:csvParse(source)}];
-  }else if(/\.xlsx$/i.test(file.name)){
-    if(!window.XLSX){await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Falha ao carregar biblioteca XLSX'));document.head.append(script)})}
-    const wb=window.XLSX.read(new Uint8Array(bytes),{type:'array',cellDates:false});
-    sheets=wb.SheetNames.map(name=>({name,rows:window.XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''})}));
+  const bytes=await file.arrayBuffer();
+  const binary=new Uint8Array(bytes);
+  const hash=globalThis.crypto?.subtle?await crypto.subtle.digest('SHA-256',bytes):null;
+  const fingerprint=hash?[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join(''):file.name+'-'+file.size+'-'+file.lastModified;
+  let sheets=[],kind='',rawLines=[],sourceHint='';
+  if(/\.(csv|tsv)$/i.test(file.name)){
+   kind='csv';
+   let decoded;try{decoded=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{decoded=new TextDecoder('windows-1252').decode(bytes)}
+   sheets=[{name:file.name.toLowerCase().endsWith('.tsv')?'TSV':'CSV',rows:csvParse(decoded)}];
+  }else if(/\.(xlsx|xls)$/i.test(file.name)){
+   kind='excel';
+   if(!window.XLSX){
+    await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='./vendor/xlsx/xlsx.full.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Falha ao carregar o leitor de Excel local. Atualize a página.'));document.head.append(script)});
+   }
+   const wb=window.XLSX.read(binary,{type:'array',cellDates:false});
+   sheets=wb.SheetNames.map(name=>({name,rows:window.XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''})}));
   }else if(/\.pdf$/i.test(file.name)){
-    const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs';
-    const pdf=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise;
-    if(pdf.numPages>35)throw Error('PDF muito longo. Limite de 35 páginas.');
-    const data=[['Data','Histórico','Valor']];for(let p=1;p<=pdf.numPages;p++){
-      const content=await (await pdf.getPage(p)).getTextContent();
-      const text=content.items.map(x=>x.str).join(' ');
-      const pattern=/(\d{2}[\/.-]\d{2}[\/.-]\d{4})\s+(.+?)\s+(-?\d[\d.,]*)(?=\s+\d{2}[\/.-]\d{2}[\/.-]\d{4}|$)/g;
-      for(const m of text.matchAll(pattern))data.push([m[1],m[2].trim(),m[3]]);
-    }
-    if(data.length===1)throw Error('O PDF não corresponde ao padrão textual suportado ou é escaneado. Exporte para Excel.');
-    sheets=[{name:'PDF textual',rows:data}];
-  }else throw Error('Formato não suportado. Use XLSX, CSV ou PDF com texto.');
-  if(!sheets.length||sheets.every(x=>x.rows.length<2))throw Error('Arquivo sem registros tabulares.');
-  if(sheets.some(s=>s.rows.length>12000))throw Error('Arquivo acima de 12 mil linhas. Separe por mês.');
-  const first=sheets[0],headers=first.rows[0].map(norm).join('|');
-  const template=scoped('templates').find(t=>t.fingerprint===headers&&t.sheet===first.name);
-  importing={filename:file.name,fingerprint,sheets,sheet:0,header:template?.header||1,mapping:template?{...template.mapping}:detect(first.rows[0]),bankId:template?.bankId||ac().find(x=>/banco/i.test(x.name))?.id||'',templateId:template?.id||'',templateName:template?.name||''};
-  go('import');notify(template?'Modelo de colunas reaplicado. Confira a prévia.':'Arquivo lido. Configure as colunas antes de importar.');
- }catch(e){notify('Não foi possível ler o arquivo: '+e.message,true)}
+   kind='pdf';
+   const pdfjs=await import('./vendor/pdfjs/pdf.mjs');
+   pdfjs.GlobalWorkerOptions.workerSrc=new URL('./vendor/pdfjs/pdf.worker.mjs',import.meta.url).href;
+   const doc=await pdfjs.getDocument({data:binary}).promise;
+   if(doc.numPages>35)throw Error('PDF acima de 35 páginas; divida o extrato por período.');
+   for(let page=1;page<=doc.numPages;page++){
+    const content=await (await doc.getPage(page)).getTextContent();
+    rawLines.push(...extractPdfLines(content.items,page));
+   }
+   if(!rawLines.length)throw Error('O PDF não contém texto selecionável. É necessário OCR ou extrato exportado em Excel.');
+   if(rawLines.length>12000)throw Error('O PDF excede 12 mil linhas de texto.');
+   sourceHint=norm(rawLines.filter(line=>!/^\s*(?:\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}|\d{4}-\d{2}-\d{2})\b/.test(line.text)).slice(0,2).map(x=>x.text).join(' ')).replace(/\d+/g,'#').slice(0,160);
+   const match=scoped('templates').find(t=>t.kind==='pdf'&&t.sourceHint===sourceHint);
+   const pdfResult=parsePDFLines(rawLines,match?.pdfPattern||'');
+   sheets=[{name:'PDF · texto extraído',rows:pdfResult.rows}];
+  }else throw Error('Formato não suportado. Use XLSX, XLS, CSV, TSV ou PDF textual.');
+  if(!sheets.length||sheets.every(x=>!x.rows.some(row=>row?.some(v=>String(v??'').trim()))))throw Error('Arquivo sem dados tabulares reconhecíveis.');
+  if(sheets.some(x=>x.rows.length>12000))throw Error('Limite de 12 mil linhas por arquivo.');
+  let index=0,found=null,inferred=null;
+  for(let i=0;i<sheets.length;i++){
+   const guess=inferTableLayout(sheets[i].rows);
+   const sig=guess.header>0?signature(sheets[i].rows[guess.header-1]):'sem-cabecalho:'+sheets[i].rows[0]?.length;
+   const saved=scoped('templates').find(t=>t.kind===kind&&(t.kind==='pdf'?t.sourceHint===sourceHint:t.fingerprint===sig));
+   if(saved){index=i;found=saved;inferred=guess;break}
+   if(!inferred||guess.score>inferred.score){index=i;inferred=guess}
+  }
+  const tab=sheets[index],layout=inferred||inferTableLayout(tab.rows);
+  const parsedPDF=kind==='pdf'?parsePDFLines(rawLines,found?.pdfPattern||''):null;
+  if(parsedPDF)sheets[index].rows=parsedPDF.rows;
+  importing={
+   filename:file.name,fingerprint,kind,sheets,sheet:index,header:found?.header??layout.header,
+   mapping:found?{...found.mapping}:{...layout.mapping},
+   confidence:found?1:layout.confidence,
+   bankId:found?.bankId||ac().find(x=>/banco/i.test(x.name))?.id||'',
+   templateId:found?.id||'',templateName:found?.name||'',
+   pdfPattern:found?.pdfPattern||'',rawLines,sourceHint,pdfResult:parsedPDF
+  };
+  go('import');
+  notify(found?'Layout da empresa reaplicado. Confira a validação antes de importar.':'Arquivo lido. Confira e salve o mapeamento.');
+ }catch(error){notify('Falha ao interpretar arquivo: '+error.message,true)}
+}
+function updatePdfPattern(){
+ if(!importing||importing.kind!=='pdf')return;
+ const pattern=document.getElementById('pdfPattern')?.value||'';
+ try{
+  const result=parsePDFLines(importing.rawLines,pattern);
+  importing.pdfPattern=pattern;
+  importing.pdfResult=result;
+  importing.sheets[importing.sheet].rows=result.rows;
+  importing.header=1;
+  importing.mapping=mappingFromHeaders(result.headers);
+  importing.confidence=result.recognized/Math.max(result.items.length,1);
+  render();
+  notify(result.recognized+' linhas reconhecidas. Revise '+result.unrecognized+' linhas não reconhecidas.');
+ }catch(error){notify('Expressão regular inválida: '+error.message,true)}
 }
 function saveTemplate(){
  if(!importing)return;
- const s=importing.sheets[importing.sheet],name=document.getElementById('templateName')?.value.trim();
- if(!name){notify('Informe o nome do modelo.',true);return}
- const fingerprint=s.rows[importing.header-1].map(norm).join('|');
- const t=scoped('templates').find(x=>x.id===importing.templateId||x.name===name);
- if(t)Object.assign(t,{name,sheet:s.name,header:importing.header,mapping:{...importing.mapping},bankId:importing.bankId,fingerprint});
- else{const item={id:uid(),companyId:active,name,sheet:s.name,header:importing.header,mapping:{...importing.mapping},bankId:importing.bankId,fingerprint};db.templates.push(item);importing.templateId=item.id}
- if(save('TEMPLATE','Layout de importação salvo: '+name))notify('Layout salvo para reutilização na próxima importação.');
+ const tab=importing.sheets[importing.sheet],name=document.getElementById('templateName')?.value.trim();
+ if(!name){notify('Informe um nome para o layout.',true);return}
+ const sig=importing.header>0?signature(tab.rows[importing.header-1]):'sem-cabecalho:'+tab.rows[0]?.length;
+ const current=scoped('templates').find(t=>t.id===importing.templateId||t.name===name);
+ const config={name,kind:importing.kind,sheet:tab.name,header:importing.header,
+  mapping:{...importing.mapping},bankId:importing.bankId,fingerprint:sig,
+  pdfPattern:importing.pdfPattern||'',sourceHint:importing.sourceHint||''};
+ if(current)Object.assign(current,config);
+ else{const saved={id:uid(),companyId:active,...config};db.templates.push(saved);importing.templateId=saved.id}
+ if(save('TEMPLATE','Layout atualizado: '+name))notify('Layout salvo para esta empresa.');
+}
+function exportInvalid(){
+ if(!importing)return;
+ const invalid=importPreview().filter(x=>x.errors.length);
+ if(!invalid.length)return notify('Nenhuma pendência encontrada.');
+ exportFile('contagi-pendencias-'+localToday()+'.csv',
+  csvExport(['Linha','Data','Histórico ou conteúdo','Valor','Problema','Dados originais'],invalid.map(x=>[x.rowNumber,x.date,x.description,decimal(x.amount),x.errors.join(' | '),JSON.stringify(x.original)])),
+  'text/csv;charset=utf-8');
 }
 function commitImport(){
- if(!importing||!importing.bankId||!account(importing.bankId))return notify('Selecione a conta bancária.',true);
- const m=importing.mapping;if(m.date===undefined||m.description===undefined||(m.amount===undefined&&(m.deposit===undefined||m.withdrawal===undefined)))return notify('Mapeie Data, Histórico e Valor ou Entrada/Saída.',true);
- const source=importing,tab=source.sheets[source.sheet],items=mapMovements(tab.rows.slice(source.header),m,source.header+1);
- const valid=items.filter(x=>!x.errors.length),bad=items.length-valid.length;
- if(!valid.length)return notify('Nenhuma linha válida. Confira o layout.',true);
- requestConfirmation('Revisar importação',valid.length+' movimentações serão importadas. '+bad+' linhas com erro serão ignoradas. Nenhum lançamento contábil será aprovado automaticamente.',()=>{
+ if(!importing||!importing.bankId||!account(importing.bankId))return notify('Selecione uma conta bancária válida.',true);
+ const map=importing.mapping;
+ if(map.date===undefined||map.description===undefined||(map.amount===undefined&&map.deposit===undefined&&map.withdrawal===undefined))return notify('Mapeie data, histórico e valor ou créditos/débitos.',true);
+ const current=importing,tab=current.sheets[current.sheet],items=importPreview(),valid=items.filter(x=>!x.errors.length),invalid=items.length-valid.length;
+ if(!valid.length)return notify('Nenhuma linha válida. Revise o mapeamento.',true);
+ requestConfirmation('Conferir importação',valid.length+' movimentações válidas serão importadas. '+invalid+' linhas com pendências permanecerão fora do razão; você pode baixar o relatório delas. Nenhum lançamento será criado automaticamente.',()=>{
   let added=0,duplicates=0;
   for(const x of valid){
-   const sourceId=source.fingerprint+'|'+tab.name+'|'+x.rowNumber;
+   const sourceId=current.fingerprint+'|'+tab.name+'|'+x.rowNumber;
    if(bankRows().some(m=>m.sourceId===sourceId)){duplicates++;continue}
-   db.movements.push({id:uid(),companyId:active,date:x.date,description:x.description,document:x.document,party:x.party,amount:x.amount,bankAccountId:source.bankId,entryId:'',source:source.filename,sourceId});added++;
+   db.movements.push({id:uid(),companyId:active,date:x.date,description:x.description,document:x.document,party:x.party,
+    amount:x.amount,bankAccountId:current.bankId,entryId:'',source:current.filename,sourceId});
+   added++;
   }
-  if(save('IMPORT','Importados '+added+' movimentos, '+duplicates+' duplicados, '+bad+' inválidos')){importing=null;go('movements');notify('Importação concluída: '+added+' novos, '+duplicates+' duplicados e '+bad+' inválidos.')}
+  if(save('IMPORT','Importados '+added+' movimentos, '+duplicates+' duplicados, '+invalid+' linhas não reconhecidas')){
+   importing=null;go('movements');notify('Importação: '+added+' novos, '+duplicates+' duplicados e '+invalid+' pendentes de revisão.');
+  }
  });
 }
 function restore(file){
@@ -273,6 +400,10 @@ function restore(file){
  }).catch(e=>notify('Backup inválido: '+e.message,true));
 }
 function onAction(action){
+ if(action==='toggle-sidebar'){navCollapsed=!navCollapsed;localStorage.setItem(KEY+'.navCollapsed',String(navCollapsed));render();return}
+ if(action==='mobile-nav'){mobileNavOpen=!mobileNavOpen;render();return}
+ if(action==='mobile-nav-close'){mobileNavOpen=false;render();return}
+ if(action==='theme-toggle'){theme=theme==='light'?'dark':'light';localStorage.setItem(THEME_KEY,theme);render();return}
  if(action==='theme-light'||action==='theme-dark'){theme=action.slice(6);localStorage.setItem(THEME_KEY,theme);render();return}
  if(action==='close'){sheet=null;sheetConfirmFn=null;render();return}
  if(action==='confirm-yes'){const callback=sheetConfirmFn;sheetConfirmFn=null;sheet=null;render();callback?.();return}
@@ -292,6 +423,8 @@ function onAction(action){
  if(action==='movements-page')return go('movements');
  if(action==='cancel-import'){importing=null;render();return}
  if(action==='save-template')return saveTemplate();
+ if(action==='apply-pdf-pattern')return updatePdfPattern();
+ if(action==='export-invalid')return exportInvalid();
  if(action==='commit-import')return commitImport();
  if(action==='backup')return exportFile('contagi-backup-'+localToday()+'.json',JSON.stringify(db,null,2),'application/json');
  if(action.startsWith('export-'))return exportCSV(action.slice(7));
@@ -385,16 +518,16 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',e=>{if(e.target.id!=='editor')return;e.preventDefault();onSave(e.target)});
 document.addEventListener('change',e=>{
  const t=e.target;
- if(t.id==='activeCompany'){active=t.value;localStorage.setItem(KEY+'.company',active);go('dashboard');return}
- if(t.id==='month'){if(!/^\d{4}-\d{2}$/.test(t.value))return;period=t.value;localStorage.setItem(KEY+'.period',period);render();return}
+ if(t.dataset.context==='company'||t.id==='activeCompany'){active=t.value;localStorage.setItem(KEY+'.company',active);go('dashboard');return}
+ if(t.dataset.context==='period'||t.id==='month'){if(!/^\d{4}-\d{2}$/.test(t.value))return;period=t.value;localStorage.setItem(KEY+'.period',period);render();return}
  if(t.id==='bankFile'){readFile(t.files[0]);return}
  if(t.id==='restore'){restore(t.files[0]);return}
  if(!importing)return;
- if(t.id==='sheet'){importing.sheet=Number(t.value);importing.header=1;importing.mapping=detect(importing.sheets[importing.sheet].rows[0]);importing.templateId='';render();return}
- if(t.id==='headerRow'){importing.header=Math.max(1,Math.min(40,Number(t.value)||1));importing.mapping=detect(importing.sheets[importing.sheet].rows[importing.header-1]||[]);render();return}
+ if(t.id==='sheet'){importing.sheet=Number(t.value);const guess=inferTableLayout(importing.sheets[importing.sheet].rows);importing.header=guess.header;importing.mapping=guess.mapping;importing.confidence=guess.confidence;importing.templateId='';render();return}
+ if(t.id==='headerRow'){importing.header=Math.max(0,Math.min(40,Number(t.value)||0));importing.mapping=importing.header?mappingFromHeaders(importing.sheets[importing.sheet].rows[importing.header-1]||[]):{date:0,description:1,amount:2};render();return}
  if(t.id==='template'){
   const mod=scoped('templates').find(x=>x.id===t.value);
-  if(mod){const s=importing.sheets.findIndex(s=>s.name===mod.sheet);if(s>=0)importing.sheet=s;importing.header=mod.header;importing.mapping={...mod.mapping};importing.bankId=mod.bankId;importing.templateId=mod.id;importing.templateName=mod.name}
+  if(mod){const s=importing.sheets.findIndex(s=>s.name===mod.sheet);if(s>=0)importing.sheet=s;importing.header=mod.header;importing.mapping={...mod.mapping};importing.bankId=mod.bankId;importing.templateId=mod.id;importing.templateName=mod.name;importing.pdfPattern=mod.pdfPattern||'';if(importing.kind==='pdf'){const parsed=parsePDFLines(importing.rawLines,importing.pdfPattern);importing.sheets[importing.sheet].rows=parsed.rows;importing.pdfResult=parsed;}}
   render();return;
  }
  if(t.id==='bankAccount'){importing.bankId=t.value;render();return}
@@ -403,6 +536,6 @@ document.addEventListener('change',e=>{
  }
 });
 document.addEventListener('input',e=>{if(e.target.id!=='query')return;const pos=e.target.selectionStart;query=e.target.value;render();const t=document.getElementById('query');t?.focus();t?.setSelectionRange(pos,pos)});
-document.addEventListener('keydown',event=>{if(!sheet)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();sheet=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&mobileNavOpen){mobileNavOpen=false;render();return}if(!sheet)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();sheet=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
 window.addEventListener('storage',e=>{if(e.key===KEY)stale=true});
 render();

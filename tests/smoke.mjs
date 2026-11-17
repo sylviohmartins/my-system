@@ -59,11 +59,13 @@ try{
  await page.locator('button[data-act="export-bank"]').click();
  const download=await downloadPromise;
  assert.match(download.suggestedFilename(),/contagi-bank-/);
- await page.locator('[data-act="theme-dark"]').click();
+ await page.evaluate(()=>localStorage.setItem('contabil.local.pages.v1.theme','light'));
+ await page.reload({waitUntil:'networkidle'});
+ await page.locator('.sidebar-footer [data-act="theme-toggle"]').click();
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
  await page.reload({waitUntil:'networkidle'});
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark','preferência de aparência preservada');
- await page.locator('[data-act="theme-light"]').click();
+ await page.locator('.sidebar-footer [data-act="theme-toggle"]').click();
  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  console.log('Desktop: lançamentos, importações CSV/XLSX, persistência, exportação, sheets e temas passaram.');
 

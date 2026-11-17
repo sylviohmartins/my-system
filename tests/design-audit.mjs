@@ -26,14 +26,19 @@ try {
    if(viewport.name==='desktop')assert.match(await page.locator('h1').first().innerText(),/Organize os fechamentos/);
    await page.locator('[data-act="demo"]').first().click();
    for(const route of paths){
-    await page.locator('[data-page="'+route+'"]').click();
+    if(viewport.width<=900)await page.locator('[data-act="mobile-nav"]').click();
+    await page.locator('[data-page="'+route+'"]').first().click();
     await page.waitForTimeout(35);
     const data=await page.evaluate(()=>{
      const root=document.documentElement;
      const buttons=[...document.querySelectorAll('main button.btn')].map(b=>({text:b.innerText.trim(),height:Math.round(b.getBoundingClientRect().height)}));
      const cards=[...document.querySelectorAll('main .card')].map(c=>({radius:getComputedStyle(c).borderRadius}));
      const metrics=[...document.querySelectorAll('main .metric')].map(e=>({top:Math.round(e.getBoundingClientRect().top),height:Math.round(e.getBoundingClientRect().height)}));
-     return {width:root.clientWidth,scrollWidth:root.scrollWidth,buttons,cards,metrics};
+     const alignedCards=[...document.querySelectorAll('main .cols>.ui-card')].map(e=>{
+      const outer=e.getBoundingClientRect(),footer=e.querySelector('.card-footer')?.getBoundingClientRect();
+      return {top:Math.round(outer.top),height:Math.round(outer.height),footerGap:footer?Math.round(outer.bottom-footer.bottom):null};
+     });
+     return {width:root.clientWidth,scrollWidth:root.scrollWidth,buttons,cards,metrics,alignedCards};
     });
     await page.addScriptTag({content:axe.source});
     const violations=await page.evaluate(async()=>{
@@ -45,13 +50,17 @@ try {
     for(const m of data.metrics){const row=byRow.get(m.top)||[];row.push(m.height);byRow.set(m.top,row)}
     for(const heights of byRow.values())if(heights.length>1&&Math.max(...heights)-Math.min(...heights)>2)fail(name+'/'+route,'Alturas de KPI diferentes na mesma linha');
     if(new Set(data.cards.map(c=>c.radius)).size>1)fail(name+'/'+route,'Raios de cards inconsistentes');
+    const cardRows=new Map();
+    for(const c of data.alignedCards){const row=cardRows.get(c.top)||[];row.push(c.height);cardRows.set(c.top,row);if(c.footerGap!==null&&Math.abs(c.footerGap)>2)fail(name+'/'+route,'Botão do card não está alinhado ao rodapé');}
+    for(const sizes of cardRows.values())if(sizes.length>1&&Math.max(...sizes)-Math.min(...sizes)>2)fail(name+'/'+route,'Cards irmãos com alturas diferentes');
     if(data.scrollWidth>data.width+2)fail(name+'/'+route,'Overflow '+data.scrollWidth+' > '+data.width);
     for(const button of data.buttons)if(button.height<34)fail(name+'/'+route,'Botão pequeno '+button.text+' '+button.height+'px');
     for(const v of violations)fail(name+'/'+route,'axe '+v.id+' ('+v.nodes.length+' nós)');
     if((route==='dashboard'||route==='movements'||route==='reports')&&(viewport.name==='desktop'||viewport.name==='mobile'))
      await page.screenshot({path:'evidence/ui/'+theme+'-'+viewport.name+'-'+route+'.png',fullPage:true});
    }
-   await page.locator('[data-page="movements"]').click();
+   if(viewport.width<=900)await page.locator('[data-act="mobile-nav"]').click();
+   await page.locator('[data-page="movements"]').first().click();
    await page.locator('[data-act^="post:"]').first().click();
    await page.addScriptTag({content:axe.source});
    const a11ySheet=await page.evaluate(async()=>{

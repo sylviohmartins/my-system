@@ -201,7 +201,7 @@ tbody td:last-child { white-space: nowrap; }
 .searchrow { padding: var(--space-4) var(--space-5); }
 .searchrow input { max-width: 420px; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-5) var(--space-6); }
-.notice { padding: var(--space-4) var(--space-5); margin: var(--space-5); border-left: 3px solid #6181b2; border-radius: var(--radius-control); background: #f0f5fc; color: #314b6c; font-size: 13px; line-height: 1.6; }
+.notice { padding: var(--space-4) var(--space-5); margin: var(--space-5); border: 1px solid #c5d5e9; border-radius: var(--radius-control); background: #f0f5fc; color: #314b6c; font-size: 13px; line-height: 1.6; }
 
 /* First-run state, dialogs and task controls */
 .welcome { margin: min(8vh, 72px) auto; max-width: 650px; padding: var(--space-12) var(--space-8); border: 1px solid var(--border); border-radius: var(--radius-modal); background: var(--surface); text-align: center; box-shadow: var(--shadow-card); }

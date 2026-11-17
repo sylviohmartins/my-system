@@ -1,6 +1,6 @@
 # DESIGN.md — Rose & Onyx · Sistema de design v3
 
-Produto: **Contábil Local** · Idioma: português brasileiro · Interfaces: Web desktop, tablet e mobile.
+Produto: **ContaGi** · Idioma: português brasileiro · Interfaces: Web desktop, tablet e mobile.
 
 ## Direção visual
 
@@ -60,7 +60,7 @@ Os tokens são definidos no próprio `styles.css`. Não atribuir cores por compo
 ### Temas
 
 - O seletor **Claro/Escuro** fica sempre disponível no cabeçalho e expõe `aria-pressed`.
-- A preferência é gravada em `localStorage` na chave `contabil.local.pages.v1.theme`, separada dos lançamentos.
+- Para manter os dados e a preferência de aparência dos navegadores existentes após a mudança de marca, preservamos a chave técnica de armazenamento legada. A preferência é gravada em `localStorage` na chave `contabil.local.pages.v1.theme`, separada dos lançamentos.
 - Na primeira visita, respeitar `prefers-color-scheme`, sem substituir uma escolha explícita.
 - Atributo de tema: `<html data-theme="light|dark">`. O tema é aplicado antes de carregar a folha de estilo para reduzir o flash de tema incorreto.
 - Nunca copiar cores do light para dark sem validar contraste. Cor de marca, superfície, borda, alerta, tabela, focus ring e sheet são tokens específicos de cada tema.

@@ -16,23 +16,23 @@ Referências de linguagem (inspiração, sem reprodução de design proprietári
 
 ## Paleta semântica: CSS como fonte única
 
-Os tokens são definidos no próprio `styles.css`. Não atribuir cores por componente sem token; usar sempre `var(--token)`.
+Os tokens base estão em `styles.css`, e `admin-shell.css` define os aliases e sobrescritas do layout administrativo. O sistema usa tokens semânticos compartilhados em ambos os temas. Não inserir cores isoladas quando já existir um token.
 
 | Token | Light Rose | Dark Onyx |
 |---|---|---|
-| `--canvas` | `#FDF5F9` | `#0B090D` |
+| `--canvas` | `#FAF8FA` | `#0D0B0E` |
 | `--surface` | `#FFFFFF` | `#1B161D` |
 | `--surface-interactive` | `#F9EAF1` | `#30212B` |
-| `--text` | `#321D2A` | `#F9EDF3` |
-| `--text-secondary` | `#58394D` | `#E6CFDB` |
-| `--brand` | `#A92363` | `#F38EBC` |
+| `--text` | `#282329` | `#F7EFF4` |
+| `--text-secondary` | `#504950` | `#E2D4DF` |
+| `--brand` | `#A72A60` | `#EF9ABF` |
 | `--brand-foreground` | `#FFFFFF` | `#2F1121` |
-| `--sidebar` | `#401A33` | `#110C13` |
-| `--border` | `#EAD2DF` | `#543749` |
+| `--sidebar` | `#271B25` | `#100E11` |
+| `--border` | `#E4DDE4` | `#453843` |
 | `--success` | `#146644` | `#83E8B2` |
 | `--danger` | `#AB284A` | `#FF9AAA` |
 
-**Contraste:** o rosa primário claro `#A92363` sobre branco alcança aproximadamente **6,76:1**, e o rosa escuro `#F38EBC` sobre `#1B161D` possui contraste superior a 6:1. O valor isolado de um token não garante acessibilidade: testar todos os pares usados pelos componentes com axe-core.
+**Contraste:** validar cada par real de cor de texto/fundo nos modos claro e escuro, incluindo componentes do menu, importação e sheets. A presença de tokens não comprova por si só conformidade WCAG; manter a auditoria automatizada e revisão manual.
 
 ## Layout, geometria e interação
 
@@ -59,11 +59,20 @@ Os tokens são definidos no próprio `styles.css`. Não atribuir cores por compo
 
 ### Temas
 
-- O seletor **Claro/Escuro** fica sempre disponível no cabeçalho e expõe `aria-pressed`.
+- A alternância de tema fica no rodapé da sidebar, com rótulo acessível; o backup fica em **Configurações e dados**, não no cabeçalho. Quando o menu está recolhido ou no celular, empresa e competência continuam disponíveis no contexto do topo.
 - Para manter os dados e a preferência de aparência dos navegadores existentes após a mudança de marca, preservamos a chave técnica de armazenamento legada. A preferência é gravada em `localStorage` na chave `contabil.local.pages.v1.theme`, separada dos lançamentos.
 - Na primeira visita, respeitar `prefers-color-scheme`, sem substituir uma escolha explícita.
 - Atributo de tema: `<html data-theme="light|dark">`. O tema é aplicado antes de carregar a folha de estilo para reduzir o flash de tema incorreto.
 - Nunca copiar cores do light para dark sem validar contraste. Cor de marca, superfície, borda, alerta, tabela, focus ring e sheet são tokens específicos de cada tema.
+
+## Shell administrativo e componentes reutilizáveis
+
+- Estrutura Supabase Studio: marca e recolhimento no cabeçalho da sidebar; empresa/competência na região de contexto; navegação central rolável com quatro grupos; configurações, aparência e status no rodapé.
+- Ícones Lucide compartilhados em `assets/icons.svg`, produzidos por `tools/build-icons.py`.
+- Componentes sem estado duplicado em `ui.mjs`: `Button`, `Card`, `MetricCard`, `PageHeader`, `DataTable`, `Nav`, `WorkspaceSelector`.
+- Ações de cards na mesma linha mantêm rodapés ancorados na base. Verificações geométricas em `tests/design-audit.mjs`.
+- Importação com estrutura heterogênea usa `importers.mjs`, mapeamento revisável, linhas inválidas exportáveis, PDF textual com regex e templates por empresa.
+- Plano de testes de todas as funcionalidades em [docs/QA-PLAN.md](docs/QA-PLAN.md).
 
 ## Prompt operacional para evolução por agentes
 

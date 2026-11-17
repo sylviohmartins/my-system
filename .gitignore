@@ -1,0 +1,33 @@
+# Dados financeiros, configurações locais e artefatos de testes
+node_modules/
+evidence/
+smoke-failure.png
+impeccable-*.json
+*.log
+*.tmp
+*.bak
+*.sqlite
+*.sqlite3
+*.db
+.env
+.env.*
+!.env.example
+backups/
+private/
+dados-clientes/
+extratos-reais/
+*.contagi-backup.json
+
+# Fixtures sintéticas são geradas pelo CI, sem dados particulares
+tests/fixtures/*.xlsx
+tests/fixtures/*.xls
+tests/fixtures/*.pdf
+!tests/fixtures/create_pdf.py
+!tests/fixtures/create_xlsx.py
+
+# Cache e IDE
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.idea/

@@ -17,12 +17,17 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.57.0 axe-core@4.11.0
           npx playwright install chromium
-      - name: Gerar Excel de exemplo fictício
-        run: python3 tests/fixtures/create_xlsx.py
-      - name: Testar UI, importação e persistência
+      - name: Gerar fixtures XLSX e PDF com dados fictícios
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/contabil-http.log 2>&1 &
+          python3 tests/fixtures/create_xlsx.py
+          python3 tests/fixtures/create_pdf.py
+      - name: Validar telas, dados, regras e layouts heterogêneos
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/contagi-http.log 2>&1 &
           node tests/smoke.mjs
+          node tests/admin-e2e.mjs
+          node tests/import-e2e.mjs
+          node tests/import-a11y.mjs
           node tests/design-audit.mjs
       - name: Capturar falha
         if: failure()
@@ -32,4 +37,5 @@ jobs:
           path: |
             smoke-failure.png
             evidence/ui/
+            evidence/import/
           if-no-files-found: ignore

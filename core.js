@@ -40,23 +40,39 @@ export function dateISO(value){
  if(typeof value==='number' && Number.isInteger(value) && value>=1 && value<=80000){
    const d=new Date(Date.UTC(1899,11,30)+value*86400000);return d.toISOString().slice(0,10);
  }
- const s=String(value??'').trim();let m;
+ const s=String(value??'').trim().replace(/\s+00:00(?::00)?$/,'');let m;
  if(m=s.match(/^(\d{4})-(\d\d)-(\d\d)$/))return validDate(+m[1],+m[2],+m[3]);
  if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))return validDate(+m[3],+m[2],+m[1]);
+ if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2})$/))return validDate(+m[3]+(Number(m[3])<70?2000:1900),+m[2],+m[1]);
  return null;
 }
 function validDate(y,m,d){const date=new Date(Date.UTC(y,m-1,d));return y>=1900&&y<=2100&&date.getUTCFullYear()===y&&date.getUTCMonth()===m-1&&date.getUTCDate()===d?date.toISOString().slice(0,10):null}
+function chooseCsvDelimiter(src){
+ const lines=src.split(/\r?\n/).filter(x=>x.trim()).slice(0,25);
+ const count=(line,sep)=>{
+  let inQuote=false,n=0;
+  for(let i=0;i<line.length;i++){
+   if(line[i]==='"'){if(inQuote&&line[i+1]==='"'){i++}else inQuote=!inQuote}
+   else if(!inQuote&&line[i]===sep)n++;
+  }
+  return n;
+ };
+ return [';',',','\t','|'].map(sep=>{
+  const counts=lines.map(line=>count(line,sep)).filter(n=>n>0);
+  return {sep,score:counts.length*4+counts.reduce((a,b)=>a+b,0)};
+ }).sort((a,b)=>b.score-a.score)[0].sep;
+}
+
 export function csvParse(src){
  const text=String(src).replace(/^\uFEFF/,'');
- const first=text.split(/\r?\n/).find(Boolean)||'';
- const sep=[';',',','\t'].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+ const sep=chooseCsvDelimiter(text);
  let out=[],row=[],cell='',quotes=false;
  for(let i=0;i<text.length;i++){
   let ch=text[i];
   if(quotes){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')quotes=false;else cell+=ch;continue}
   if(ch==='"'){quotes=true;continue}
   if(ch===sep){row.push(cell);cell='';continue}
-  if(ch==='\n'||ch==='\r'){row.push(cell);if(row.some(x=>String(x).trim()))out.push(row);row=[];cell='';if(ch==='\r'&&text[i+1]==='\n')i++;continue}
+  if(ch==='\n'||ch==='\r'){row.push(cell);out.push(row);row=[];cell='';if(ch==='\r'&&text[i+1]==='\n')i++;continue}
   cell+=ch;
  }
  if(quotes)throw Error('Aspas não fechadas no CSV');

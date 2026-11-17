@@ -26,7 +26,12 @@ jobs:
       - name: Preparar artefato sem arquivos privados
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js core.js .nojekyll _site/
+          cp index.html styles.css admin-shell.css app.js core.js ui.mjs importers.mjs .nojekyll _site/
+          mkdir -p _site/assets _site/vendor/pdfjs _site/vendor/xlsx _site/vendor/licenses
+          cp assets/icons.svg _site/assets/
+          cp vendor/pdfjs/pdf.mjs vendor/pdfjs/pdf.worker.mjs _site/vendor/pdfjs/
+          cp vendor/xlsx/xlsx.full.min.js _site/vendor/xlsx/
+          cp vendor/licenses/*.txt _site/vendor/licenses/
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
       - name: Enviar artefato

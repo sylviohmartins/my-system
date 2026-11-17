@@ -40,7 +40,7 @@ export function Nav(groups,active,pending){
  +'</section>').join('');
 }
 export function WorkspaceSelector(companies,active,month,optionRenderer,variant='sidebar'){
- return '<section class="workspace-selector '+escapeHTML(variant)+'" aria-label="Contexto de trabalho">'
+ return '<section class="workspace-selector '+escapeHTML(variant==='sidebar'?'context-sidebar':variant)+'" aria-label="Contexto de trabalho">'
  +'<label class="context-field"><span>'+Icon('building-2')+' Empresa</span><select data-context="company" aria-label="Empresa ativa">'+optionRenderer(companies.map(c=>[c.id,c.name]),active,'Selecione uma empresa')+'</select></label>'
  +'<label class="context-field"><span>'+Icon('calendar-days')+' Competência</span><input data-context="period" type="month" aria-label="Competência ativa" value="'+escapeHTML(month)+'"></label>'
  +'</section>';

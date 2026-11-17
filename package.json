@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check app.js && node --check core.js",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "design:scan": "npx --yes impeccable@4.9.2 detect --json .",
+    "design:verify": "npm run verify && npm run design:scan"
   }
 }

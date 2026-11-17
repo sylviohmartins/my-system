@@ -12,10 +12,12 @@ try{
  await page.locator('button[data-act="demo"]').first().click();
  assert.equal(await page.locator('button[data-act^="post:"]').count(),1);
  await page.locator('button[data-act^="post:"]').click();
- assert.match(await page.locator('.modal-title h2').innerText(),/Classificar movimentação/);
+ assert.match(await page.locator('.sheet-header h2').innerText(),/Classificar movimentação/);
+ assert.equal(await page.locator('.modal-layer').count(),0,'não existem modais centralizados');
  const select=page.locator('#editor select[name="counterpartId"]');
  await select.selectOption({label:'5.1.01 · Despesa com serviços'});
  await page.locator('#editor button[type="submit"]').click();
+ await page.locator('.sheet-panel [data-act="confirm-yes"]').click();
  await page.waitForTimeout(150);
  assert.equal(await page.locator('button[data-act^="post:"]').count(),0,'lançamento foi vinculado');
  await page.locator('button[data-page="entries"]').click();
@@ -32,6 +34,7 @@ try{
  await page.locator('#templateName').fill('Banco X — layout mensal');
  await page.locator('button[data-act="save-template"]').click();
  await page.locator('button[data-act="commit-import"]').click();
+ await page.locator('.sheet-panel [data-act="confirm-yes"]').click();
  await page.waitForTimeout(100);
  assert.match(await page.locator('main').innerText(),/PIX fornecedor X/);
  await page.reload({waitUntil:'networkidle'});
@@ -43,6 +46,7 @@ try{
  assert.match(await page.locator('main').innerText(),/TARIFA TESTE XLSX/);
  assert.match(await page.locator('main').innerText(),/1 válidas/);
  await page.locator('button[data-act="commit-import"]').click();
+ await page.locator('.sheet-panel [data-act="confirm-yes"]').click();
  await page.locator('button[data-page="movements"]').click();
  assert.match(await page.locator('main').innerText(),/TARIFA TESTE XLSX/,'XLSX importado com sucesso');
 
@@ -53,7 +57,13 @@ try{
  await page.locator('button[data-act="export-bank"]').click();
  const download=await downloadPromise;
  assert.match(download.suggestedFilename(),/contabil-bank-/);
- console.log('Desktop: empresa, contabilização, importação CSV, modelo, persistência e exportação passaram.');
+ await page.locator('[data-act="theme-dark"]').click();
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+ await page.reload({waitUntil:'networkidle'});
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'dark','preferência de aparência preservada');
+ await page.locator('[data-act="theme-light"]').click();
+ assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+ console.log('Desktop: lançamentos, importações CSV/XLSX, persistência, exportação, sheets e temas passaram.');
 
  const mobile=await context.newPage();
  await mobile.setViewportSize({width:390,height:844});

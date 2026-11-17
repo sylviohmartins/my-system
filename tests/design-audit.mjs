@@ -37,6 +37,8 @@ try{
     return results.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary?.slice(0,200)})).slice(0,12)}));
    });
    report.views.push({viewport:viewport.name,page:name,metrics:data,a11y});
+   const byRow=new Map();for(const m of data.metrics){const group=byRow.get(m.top)||[];group.push(m.height);byRow.set(m.top,group)}for(const heights of byRow.values()){if(heights.length>1&&Math.max(...heights)-Math.min(...heights)>2)report.failures.push(viewport.name+'/'+name+': KPIs desalinhados em altura')}
+   if(new Set(data.cards.map(c=>c.radius)).size>1)report.failures.push(viewport.name+'/'+name+': raios de cards inconsistentes');
    if(data.overflow)report.failures.push(viewport.name+'/'+name+': overflow '+data.scrollWidth+' > '+data.width);
    for(const b of data.buttons){if(b.height<34)report.failures.push(viewport.name+'/'+name+': botão pequeno '+b.text+' '+b.height+'px')}
    for(const v of a11y){report.failures.push(viewport.name+'/'+name+': axe '+v.id+' ('+v.nodes.length+' nós)')}
@@ -54,6 +56,9 @@ try{
   report.views.push({viewport:viewport.name,page:'modal/post',a11y:a11yModal});
   a11yModal.forEach(v=>report.failures.push(viewport.name+'/modal: axe '+v.id));
   await page.screenshot({path:'evidence/ui/'+viewport.name+'-modal.png',fullPage:true});
+  if(await page.locator('[role="dialog"]').count()!==1)report.failures.push(viewport.name+'/modal: sem papel de diálogo');
+  await page.keyboard.press('Escape');
+  if(await page.locator('[role="dialog"]').count())report.failures.push(viewport.name+'/modal: Escape não fechou');
   errors.forEach(e=>report.failures.push(viewport.name+': runtime '+e));
   await ctx.close();
  }

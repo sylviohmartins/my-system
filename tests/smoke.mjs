@@ -9,6 +9,8 @@ try{
  page.on('dialog',dialog=>dialog.accept());
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
  assert.match(await page.locator('h1').first().innerText(),/Organize os fechamentos/i);
+ assert.match(await page.title(),/^ContaGi/);
+ assert.equal(await page.locator('.brand-wordmark').first().innerText(),'ContaGi');
  await page.locator('button[data-act="demo"]').first().click();
  assert.equal(await page.locator('button[data-act^="post:"]').count(),1);
  await page.locator('button[data-act^="post:"]').click();
@@ -56,7 +58,7 @@ try{
  const downloadPromise=page.waitForEvent('download');
  await page.locator('button[data-act="export-bank"]').click();
  const download=await downloadPromise;
- assert.match(download.suggestedFilename(),/contabil-bank-/);
+ assert.match(download.suggestedFilename(),/contagi-bank-/);
  await page.locator('[data-act="theme-dark"]').click();
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
  await page.reload({waitUntil:'networkidle'});

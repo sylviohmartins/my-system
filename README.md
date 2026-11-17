@@ -1,6 +1,6 @@
-# Contábil Local — extrato → lançamento → conciliação
+# ContaGi — extrato → lançamento → conciliação
 
-Aplicação web estática e experimental de apoio a rotinas contábeis brasileiras. **Nome do produto provisório.**
+Aplicação web estática e experimental de apoio a rotinas contábeis brasileiras. **Nome oficial do produto: ContaGi.**
 
 ## Por que existe
 O escritório recebe mensalmente planilhas de extratos bancários e transforma as movimentações em lançamentos por partidas dobradas, usando plano de contas por empresa. O sistema separa **movimentação bancária**, **lançamento contábil** e **conciliação** para não confundir uma transferência com receita/despesa.

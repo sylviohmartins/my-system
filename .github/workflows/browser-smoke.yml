@@ -1,0 +1,30 @@
+name: Smoke real de navegador
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar Playwright sem alterar dependências do projeto
+        run: |
+          npm install --no-save --package-lock=false playwright@1.57.0
+          npx playwright install chromium
+      - name: Testar UI, importação e persistência
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/contabil-http.log 2>&1 &
+          node tests/smoke.mjs
+      - name: Capturar falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure
+          path: smoke-failure.png
+          if-no-files-found: ignore

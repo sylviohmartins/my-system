@@ -2,7 +2,7 @@
 
 ## Referência de arquitetura
 
-A composição acompanha os princípios publicados pelo Supabase Studio: 
+A composição acompanha os princípios publicados pelo Supabase Studio:
 - [Layout / Page Breadcrumbs, Page Header e Page Container](https://supabase.com/design-system/docs/ui-patterns/layout)
 - [Sidebar / SidebarProvider, SidebarContent e SidebarRail](https://supabase.com/design-system/docs/components/sidebar)
 - [Código-fonte do Supabase Studio](https://github.com/supabase/supabase/tree/master/apps/studio)

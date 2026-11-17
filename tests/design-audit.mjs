@@ -16,7 +16,7 @@ try {
  for(const theme of ['light','dark']){
   for(const viewport of sizes){
    const name=theme+'/'+viewport.name;
-   const ctx=await browser.newContext({viewport,acceptDownloads:true,locale:'pt-BR'});
+   const ctx=await browser.newContext({viewport,acceptDownloads:true,locale:'pt-BR',reducedMotion:'reduce'});
    await ctx.addInitScript(choice=>localStorage.setItem('contabil.local.pages.v1.theme',choice),theme);
    const page=await ctx.newPage();
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -72,9 +72,23 @@ try {
     await page.keyboard.press('Tab');
     if(!await page.evaluate(()=>!!document.activeElement?.closest('.sheet-panel')))fail(name+'/sheet','Tab saiu do sheet');
    }
-   await page.screenshot({path:'evidence/ui/'+theme+'-'+viewport.name+'-sheet.png',fullPage:true});
+   await page.screenshot({path:'evidence/ui/'+theme+'-'+viewport.name+'-sheet.png',fullPage:false});
    await page.keyboard.press('Escape');
    if(await sheet.count())fail(name+'/sheet','Escape não fechou');
+   await page.locator('[data-act^="post:"]').first().click();
+   await page.locator('#editor select[name="counterpartId"]').selectOption({label:'5.1.01 · Despesa com serviços'});
+   await page.locator('#editor button[type="submit"]').click();
+   if(await page.locator('.sheet-confirm-content').count()!==1)fail(name+'/confirmation','Confirmação não abriu em sheet');
+   await page.addScriptTag({content:axe.source});
+   const a11yConfirm=await page.evaluate(async()=>{
+     const results=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}});
+     return results.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.map(n=>n.target).slice(0,12)}));
+   });
+   report.views.push({theme,viewport:viewport.name,page:'sheet/confirm',a11y:a11yConfirm});
+   a11yConfirm.forEach(v=>fail(name+'/confirmation','axe '+v.id));
+   if((viewport.name==='desktop'||viewport.name==='mobile'))await page.screenshot({path:'evidence/ui/'+theme+'-'+viewport.name+'-confirm.png',fullPage:false});
+   await page.keyboard.press('Escape');
+   if(await sheet.count())fail(name+'/confirmation','Escape não fechou');
    errors.forEach(e=>fail(name,'Erro em tempo de execução '+e));
    await ctx.close();
   }

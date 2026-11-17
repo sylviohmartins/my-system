@@ -1,12 +1,12 @@
-# ContaGi — gestão contábil de extratos e lançamentos
+# ContaGil — gestão contábil de extratos e lançamentos
 
-**ContaGi** é uma aplicação estática com interfaces Rose Light e Onyx Dark para receber extratos, conferir linhas, mapear layouts recorrentes de cada empresa, registrar lançamentos em partidas dobradas e revisar composições e relatórios.
+**ContaGil** é uma aplicação estática com interfaces Rose Light e Onyx Dark para receber extratos, conferir linhas, mapear layouts recorrentes de cada empresa, registrar lançamentos em partidas dobradas e revisar composições e relatórios.
 
 **Site:** https://sylviohmartins.github.io/my-system/  
 **Código:** https://github.com/sylviohmartins/my-system
 
 ## Fluxo de operação
-1. Escolha **empresa** e **competência** no contexto do menu administrativo (também acessível na barra superior quando o menu está recolhido ou em dispositivos móveis).
+1. Selecione **empresa** e **competência** no cabeçalho superior, sempre visíveis no desktop e no celular.
 2. Acesse **Importar arquivos** e selecione Excel XLSX/XLS, CSV/TSV ou PDF com texto selecionável.
 3. Confira a aba, a linha de cabeçalho e o mapeamento para data, histórico, valor (com sinal ou colunas separadas), documento e favorecido.
 4. Para PDF, veja a extração por linha e página e, se necessário, configure uma expressão regular com grupos nomeados `date`, `description` e `amount`.
@@ -16,11 +16,11 @@
 8. Acompanhe lançamentos, composição de clientes e fornecedores, conciliação e relatórios preliminares. Exporte CSV/JSON quando necessário.
 
 ## Interface e identidade
-- **Marca ContaGi**, dois temas rosa claro e preto com rosa, tokens em `styles.css` e `admin-shell.css`.
-- **Admin inspirado no Supabase:** menu com grupos, recolhimento para rail de ícones, seleção de contexto, indicador de pendências, versão móvel off-canvas e tema em Configurações/rodapé.
-- **Componentes compartilhados** em `ui.mjs`: botões, cabeçalhos, cards, métricas, tabelas, navegação e seletor de empresa/competência. Ícones Lucide em sprite local.
-- **Sheets laterais**, não modais centralizados; foco, Escape e rodapé de ações fixo.
-- Especificação em [DESIGN.md](DESIGN.md); plano de QA em [docs/QA-PLAN.md](docs/QA-PLAN.md).
+- **Marca ContaGil:** logotipo caligráfico vetorial com “Conta” e “l” pretos no tema claro e “Gi” rosa; variante de alto contraste no escuro. Favicon com “Gi”, ícones 16–512 px, Apple touch e manifesto Web App em `assets/brand/`.
+- **Admin inspirado na implementação aberta do Supabase Studio:** barra vertical compacta de áreas (56 px), painel secundário contextual (232 px), empresa/competência no topo, navegação móvel off-canvas, pesquisa global `Ctrl+K`, alternância de tema e acesso a Configurações no cabeçalho. O código do projeto é independente; foram adaptados conceitos de arquitetura, não componentes proprietários.
+- **Componentes compartilhados** em `ui.mjs`: botões, cabeçalhos, cards, métricas, tabelas, navegação e seletor de empresa/competência. Ícones Lucide em sprite local. Tokens Rose/Onyx em `styles.css`, `admin-shell.css` e `studio-shell.css`.
+- **Sheets laterais**, não modais centralizados; foco, Escape e rodapé de ações fixo. A navegação e o menu também fecham com Escape.
+- Referências verificadas: [Supabase Studio open source](https://github.com/supabase/supabase/tree/master/apps/studio), [código do ProjectLayout](https://github.com/supabase/supabase/blob/master/apps/studio/components/layouts/ProjectLayout/index.tsx) e [documentação de Sidebar](https://supabase.com/design-system/docs/components/sidebar). Especificação em [DESIGN.md](DESIGN.md); plano de QA em [docs/QA-PLAN.md](docs/QA-PLAN.md).
 
 ## Executar localmente
 Requisitos: navegador atualizado, Python 3 ou servidor HTTP estático e, para executar testes, Node.js 24.
@@ -56,4 +56,4 @@ O workflow `.github/workflows/browser-smoke.yml` prepara as fixtures sintéticas
 
 Limites por importação: 10 MB, até 12 mil linhas de tabela; PDF até 35 páginas. **PDF escaneado não é reconhecido sem OCR**. Alguns layouts exigem mapeamento manual e homologação com o contador. Os relatórios são preliminares, não substituem SPED/ECD, cálculo fiscal, fechamento ou parecer técnico. Antes de uso profissional, migrar para armazenamento transacional seguro, implementar acessos, auditoria imutável, indicadores de execução e reprocessamento seguro.
 
-A chave de armazenamento legada `contabil.local.pages.v1` foi mantida para preservar dados criados antes da mudança de nome para ContaGi. Faça regularmente backup JSON em um dispositivo seguro.
+A chave de armazenamento legada `contabil.local.pages.v1` foi mantida para preservar dados criados antes da mudança de nome para ContaGil. Faça regularmente backup JSON em um dispositivo seguro.

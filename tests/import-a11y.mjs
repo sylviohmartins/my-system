@@ -16,7 +16,8 @@ try{
    await page.goto(base,{waitUntil:'networkidle'});
    await page.locator('[data-act="demo"]').click();
    if(width<901)await page.locator('[data-act="mobile-nav"]').click();
-   await page.locator('[data-page="import"]').first().click();
+   await page.locator('[data-act="nav-area:1"]').click();
+   await page.locator('.studio-items [data-page="import"]').click();
    await page.locator('#bankFile').setInputFiles('tests/fixtures/extrato-banco-a.pdf');
    await page.locator('#pdfPattern').waitFor({state:'visible',timeout:20000});
    await page.addScriptTag({content:axe.source});

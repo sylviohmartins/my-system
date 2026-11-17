@@ -1,8 +1,8 @@
-import {KEY,TYPES,DEFAULTS,newDB,uid,norm,fmt,decimal,cents,dateISO,csvParse,csvExport,detect,mapMovements,suggestion,createEntry,bankEffect,report} from './core.js';
+import {KEY,TYPES,DEFAULTS,newDB,uid,norm,fmt,decimal,cents,dateISO,csvParse,csvExport,detect,mapMovements,suggestion,createEntry,bankEffect,report,titleOutstanding,controlTotals} from './core.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const localToday=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
-function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v?.version===1&&['companies','accounts','movements','entries','templates','rules','audit'].every(x=>Array.isArray(v[x])))return v}catch{}return newDB()}
+function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v?.version===1&&['companies','accounts','movements','entries','templates','rules','audit'].every(x=>Array.isArray(v[x])))return {...newDB(),...v}}catch{}return newDB()}
 let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,modal=null,query='',notice='',warning='',stale=false;
 if(!db.companies.some(x=>x.id===active))active=db.companies[0]?.id||'';
 const co=()=>db.companies.find(x=>x.id===active);
@@ -28,11 +28,11 @@ const card=(title,body,actions='')=>'<section class="card"><div class="card-head
 function table(headers,rows){return '<div class="table-scroll"><table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+headers.length+'" class="muted">Nenhum registro para exibir</td></tr>')+'</tbody></table></div>'}
 function header(title,sub,action=''){return '<div class="heading"><div><p class="overline">'+esc(co()?.name||'AMBIENTE LOCAL')+' / '+esc(period)+'</p><h1>'+title+'</h1><p class="muted">'+sub+'</p></div><div class="inline">'+action+'</div></div>'}
 function layout(content){
- const links=[['dashboard','Visão geral','◫'],['companies','Empresas','▣'],['accounts','Plano de contas','≡'],['import','Importar extrato','⇧'],['movements','Extratos','⇄'],['entries','Lançamentos','▤'],['reconcile','Conciliação','◎'],['reports','Relatórios','▥'],['settings','Backup e regras','⚙']];
+ const links=[['dashboard','Visão geral','◫'],['companies','Empresas','▣'],['accounts','Plano de contas','≡'],['parties','Terceiros e títulos','♧'],['import','Importar extrato','⇧'],['movements','Extratos','⇄'],['entries','Lançamentos','▤'],['reconcile','Conciliação','◎'],['reports','Relatórios','▥'],['settings','Backup e regras','⚙']];
  document.getElementById('app').innerHTML='<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-mark">C</span><div><strong>Contábil Local</strong><small>GESTÃO DE LANÇAMENTOS</small></div></div><div class="nav-heading">ESCRITÓRIO</div><nav>'+links.map(([id,name,symbol])=>'<button class="nav-link '+(page===id?'active':'')+'" data-page="'+id+'"><span class="nav-icon">'+symbol+'</span>'+name+'</button>').join('')+'</nav><div class="side-foot"><span class="dot"></span> Seus dados ficam neste navegador</div></aside><div class="work"><div class="topbar"><div class="mobile-brand">Contábil Local</div><div class="top-right"><label>Empresa <select id="activeCompany">'+opt(db.companies.map(x=>[x.id,x.name]),active,'Sem empresa')+'</select></label><label>Competência <input id="month" type="month" value="'+esc(period)+'"></label><button class="btn subtle" data-act="backup">Backup JSON</button></div></div><main class="content">'+(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')+(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')+content+'<footer>Protótipo de apoio contábil · Não substitui escrituração oficial ou revisão profissional. <span>Dados locais, sem sincronização.</span></footer></main></div></div>'+modalHTML();
 }
 function render(){if(!co()&&!['companies','settings'].includes(page))return layout('<div class="welcome"><div class="symbol">▣</div><h1>Organize os fechamentos de cada empresa.</h1><p>Cadastre seu primeiro cliente para importar extratos, classificar movimentações e gerar lançamentos contábeis.</p>'+btn('new-company','Cadastrar empresa','primary')+' '+btn('demo','Explorar com dados fictícios','subtle')+'</div>');
- const views={dashboard:dashboard,companies:companies,accounts:accounts,import:importView,movements:movements,entries:entries,reconcile:reconcile,reports:reports,settings:settings};
+ const views={dashboard:dashboard,companies:companies,accounts:accounts,parties:partiesView,import:importView,movements:movements,entries:entries,reconcile:reconcile,reports:reports,settings:settings};
  layout((views[page]||dashboard)());
 }
 function dashboard(){
@@ -89,7 +89,7 @@ function reconcile(){
  +'<div class="metrics compact"><div class="metric"><span>Extratos sem lançamento</span><strong>'+ms.filter(m=>!m.entryId).length+'</strong></div><div class="metric"><span>Vínculos confirmados</span><strong>'+ms.filter(m=>m.entryId).length+'</strong></div><div class="metric"><span>Movimentação bancária</span><strong>'+fmt(totalBank)+'</strong></div></div>'
  +card('Conferência das transações','<div class="notice">O vínculo criado na contabilização confirma apenas a correspondência daquele movimento. Para conciliação bancária integral, compare também saldos de abertura e encerramento e itens em trânsito.</div>'
  +table(['Data','Documento / histórico','Extrato','Lançamento','Status'],ms.map(m=>{const e=es.find(e=>e.id===m.entryId);return '<tr><td>'+esc(m.date)+'</td><td>'+esc(m.description)+'</td><td>'+fmt(m.amount)+'</td><td>'+esc(e?e.id.slice(0,8):'—')+'</td><td><span class="pill '+(e?'good':'warn')+'">'+(e?'Vinculado':'Pendente')+'</span></td></tr>'}).join('')))
- +'<p class="help">Referência informativa: soma de movimentos do extrato '+fmt(totalBank)+'; movimento do razão em contas bancárias identificadas por nome '+fmt(totalLedger)+'. Não equiparar esses totais à conciliação completa.</p>';
+  +controlsComparison()+'<p class="help">Referência informativa: soma de movimentos do extrato '+fmt(totalBank)+'; movimento do razão em contas bancárias identificadas por nome '+fmt(totalLedger)+'. Não equiparar esses totais à conciliação completa.</p>';
 }
 function reports(){
  const {rows,assets,liabilities,equity,profit,monthlyProfit,revenue,expense,totalDebits,totalCredits}=report(ac(),journal(),monthEnd(),period);
@@ -100,6 +100,26 @@ function reports(){
  +'<div class="summaryline"><b>Total débitos</b><strong>'+fmt(totalDebits)+'</strong></div><div class="summaryline"><b>Total créditos</b><strong>'+fmt(totalCredits)+'</strong></div>')
  +card('Balanço simplificado','<div class="pad"><div class="summaryline"><span>Ativo</span><b>'+fmt(assets)+'</b></div><div class="summaryline"><span>Passivo</span><b>'+fmt(liabilities)+'</b></div><div class="summaryline"><span>Patrimônio líquido</span><b>'+fmt(equity)+'</b></div><div class="summaryline"><span>Resultado acumulado (sem encerramento)</span><b>'+fmt(profit)+'</b></div><div class="summaryline"><b>Diferença de consistência</b><b>'+fmt(diff)+'</b></div></div>');
 }
+
+function partiesView(){
+ const parties=scoped('parties'),titles=scoped('titles').filter(t=>t.date<=monthEnd());
+ const opens=titles.map(t=>({...t,outstanding:titleOutstanding(t,monthEnd())})).filter(t=>t.outstanding>0);
+ return header('Clientes, fornecedores e títulos','Composição auxiliar por documento, data e terceiro. Baixas não geram lançamentos automaticamente.',btn('new-party','Novo terceiro','outline')+' '+btn('new-title','Novo título','primary')+' '+btn('export-titles','Exportar CSV','outline'))
+ +'<div class="metrics compact"><div class="metric"><span>Terceiros cadastrados</span><strong>'+parties.length+'</strong></div><div class="metric"><span>Clientes a receber</span><strong>'+fmt(opens.filter(t=>t.type==='receivable').reduce((s,t)=>s+t.outstanding,0))+'</strong></div><div class="metric"><span>Fornecedores a pagar</span><strong>'+fmt(opens.filter(t=>t.type==='payable').reduce((s,t)=>s+t.outstanding,0))+'</strong></div></div>'
+ +card('Composição dos títulos em aberto',table(['Terceiro','Documento','Tipo','Emissão','Vencimento','Saldo','Ações'],opens.map(t=>'<tr><td>'+esc(parties.find(p=>p.id===t.partyId)?.name||'—')+'</td><td>'+esc(t.document)+'</td><td>'+esc(t.type==='receivable'?'A receber':'A pagar')+'</td><td>'+esc(t.date)+'</td><td>'+esc(t.dueDate||'—')+'</td><td>'+fmt(t.outstanding)+'</td><td>'+btn('settle:'+t.id,'Registrar baixa','primary small')+'</td></tr>').join('')))
+ +card('Cadastro de terceiros',table(['Nome','Tipo','Documento'],parties.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.kind==='customer'?'Cliente':'Fornecedor')+'</td><td>'+esc(p.document||'—')+'</td></tr>').join('')))
+ +'<div class="notice">Os títulos são controles auxiliares. Para que o razão contábil reflita a obrigação ou o direito, registre os lançamentos correspondentes e confira a conciliação.</div>';
+}
+function controlsComparison(){
+ const titles=scoped('titles'),totals=controlTotals(titles,monthEnd());
+ const trial=report(ac(),journal(),monthEnd(),period);
+ const findCode=code=>trial.rows.find(a=>a.code===code);
+ const clients=findCode('1.1.03'),suppliers=findCode('2.1.01');
+ const items=[['Clientes a receber',clients?.balance??null,totals.receivable],['Fornecedores a pagar',suppliers?.balance??null,totals.payable]];
+ return card('Conciliação auxiliar de clientes e fornecedores','<div class="notice">Compare o saldo dos títulos com o razão. A comparação usa as contas-padrão 1.1.03 e 2.1.01; ajuste os códigos caso o plano da empresa seja diferente.</div>'
+ +table(['Conta controle','Razão contábil','Composição auxiliar','Diferença'],items.map(([name,ledger,sub])=>'<tr><td>'+name+'</td><td>'+(ledger===null?'Conta não cadastrada':fmt(ledger))+'</td><td>'+fmt(sub)+'</td><td class="'+(ledger!==null&&ledger!==sub?'negative':'positive')+'">'+(ledger===null?'Não comparável':fmt(ledger-sub))+'</td></tr>').join('')));
+}
+
 function settings(){
  return header('Backup e regras','Regras são sugestões locais, não decisões contábeis automáticas.',btn('backup','Baixar backup JSON','primary'))
  +'<div class="cols">'+card('Regras por palavra-chave','<div class="pad"><p class="muted">Uma regra é aplicada apenas ao cliente atual e pode ser descartada sem afetar lançamentos existentes.</p>'+btn('new-rule','Nova regra','outline')+scoped('rules').map(r=>'<div class="summaryline"><span><b>'+esc(r.term)+'</b><small class="muted"> → '+esc(label(r.accountId))+'</small></span>'+btn('remove-rule:'+r.id,'Excluir','ghost small')+'</div>').join('')+'</div>')
@@ -124,6 +144,19 @@ function modalHTML(){
     +input('ruleTerm','Palavra-chave da regra (opcional)','text',m.description.split(/\s+/).slice(0,3).join(' '),false);
  }
  if(kind==='manual-entry'){title='Lançamento manual';body=input('date','Data','date',localToday())+input('description','Histórico')+input('document','Documento','text','',false)+input('amount','Valor (R$)')+pick('debit','Conta de débito',accountOptions())+pick('credit','Conta de crédito',accountOptions())}
+
+ if(kind==='party'){title='Cadastrar terceiro';body=input('name','Nome do terceiro')+pick('kind','Tipo',opt([['customer','Cliente'],['supplier','Fornecedor']],'customer'))+input('document','CPF/CNPJ ou identificação','text','',false)}
+ if(kind==='title'){
+  title='Novo título a receber ou pagar';
+  const third=scoped('parties').map(p=>[p.id,p.name+' · '+(p.kind==='customer'?'Cliente':'Fornecedor')]);
+  body=pick('partyId','Cliente ou fornecedor',opt(third,'','Selecione'))+pick('type','Natureza do título',opt([['receivable','A receber'],['payable','A pagar']],'receivable'))+input('document','Documento / nota')+input('date','Data de emissão','date',localToday())+input('dueDate','Vencimento','date',localToday())+input('amount','Valor (R$)');
+ }
+ if(kind==='settle'){
+  const titleRec=scoped('titles').find(t=>t.id===id);
+  title='Registrar baixa de título';
+  help='<div class="notice">Documento '+esc(titleRec?.document)+' · Saldo em aberto '+fmt(titleOutstanding(titleRec,monthEnd()))+'. A baixa atualiza o auxiliar, não a escrituração.</div>';
+  body=input('date','Data da baixa','date',localToday())+input('amount','Valor pago/recebido (R$)');
+ }
  if(kind==='rule'){title='Nova regra de sugestão';body=input('term','Palavra-chave')+pick('accountId','Conta sugerida',accountOptions())}
  return '<div class="modal-layer"><div class="modal"><div class="modal-title"><h2>'+title+'</h2><button class="icon-btn" type="button" data-act="close">×</button></div>'+help+'<form id="editor" data-kind="'+action+'" data-id="'+esc(id||'')+'"><div class="form-layout pad">'+body+'</div><div class="modal-actions">'+btn('close','Cancelar','outline')+'<button type="submit" class="btn primary">Salvar</button></div></form></div></div>';
 }
@@ -133,6 +166,7 @@ function exportCSV(kind){
  if(kind==='accounts'){head=['Código','Conta','Grupo'];rows=ac().map(x=>[x.code,x.name,TYPES[x.type]])}
  if(kind==='bank'){head=['Data','Histórico','Documento','Valor (R$)','Código banco','Status'];rows=bankRows().filter(x=>x.date.startsWith(period)).map(x=>[x.date,x.description,x.document,decimal(x.amount),account(x.bankAccountId)?.code,x.entryId?'Lançado':'Pendente'])}
  if(kind==='entries'){head=['Data','Histórico','Documento','Código débito','Código crédito','Valor (R$)'];rows=journal().filter(x=>x.date.startsWith(period)).map(x=>[x.date,x.description,x.document,account(x.debitAccountId)?.code,account(x.creditAccountId)?.code,decimal(x.amount)])}
+ if(kind==='titles'){head=['Terceiro','Tipo','Documento','Emissão','Vencimento','Valor (R$)','Saldo (R$)'];rows=scoped('titles').filter(t=>t.date<=monthEnd()).map(t=>[scoped('parties').find(p=>p.id===t.partyId)?.name||'',t.type,t.document,t.date,t.dueDate,decimal(t.amount),decimal(titleOutstanding(t,monthEnd()))])}
  if(kind==='trial'){const r=report(ac(),journal(),monthEnd(),period);head=['Código','Conta','Tipo','Débitos (R$)','Créditos (R$)','Saldo (R$)'];rows=r.rows.map(x=>[x.code,x.name,TYPES[x.type],decimal(x.debit),decimal(x.credit),decimal(x.balance)])}
  exportFile('contabil-'+kind+'-'+period+'.csv',csvExport(head,rows),'text/csv;charset=utf-8');
 }
@@ -221,6 +255,9 @@ function onAction(action){
  if(action==='demo')return seed();
  if(action==='new-company'){modal={kind:'company'};render();return}
  if(action==='new-account'){modal={kind:'account'};render();return}
+ if(action==='new-party'){modal={kind:'party'};render();return}
+ if(action==='new-title'){if(!scoped('parties').length)return notify('Cadastre um cliente ou fornecedor antes do título.',true);modal={kind:'title'};render();return}
+ if(action.startsWith('settle:')){const t=scoped('titles').find(x=>x.id===action.split(':')[1]);if(!t)return;modal={kind:'settle',id:t.id};render();return}
  if(action.startsWith('edit-account:')){modal={kind:'edit-account',id:action.split(':')[1]};render();return}
  if(action==='manual-bank'){modal={kind:'manual-bank'};render();return}
  if(action==='manual-entry'){modal={kind:'manual-entry'};render();return}
@@ -285,6 +322,24 @@ function onSave(form){
   const amount=cents(v('amount'));
   if(!dateISO(v('date'))||!v('description')||!amount||amount<=0||!account(v('debit'))||!account(v('credit'))||v('debit')===v('credit'))return notify('Informe valor positivo e duas contas distintas.',true);
   db.entries.push({id:uid(),companyId:active,movementId:'',date:v('date'),description:v('description'),document:v('document'),amount,debitAccountId:v('debit'),creditAccountId:v('credit'),status:'approved'});
+ }
+
+ if(kind==='party'){
+  if(!v('name')||!['customer','supplier'].includes(v('kind')))return notify('Informe nome e tipo do terceiro.',true);
+  db.parties.push({id:uid(),companyId:active,name:v('name'),kind:v('kind'),document:v('document')});
+ }
+ if(kind==='title'){
+  const amount=cents(v('amount')),party=scoped('parties').find(p=>p.id===v('partyId'));
+  if(!party||!['receivable','payable'].includes(v('type'))||!v('document')||!dateISO(v('date'))||!dateISO(v('dueDate'))||amount===null||amount<=0)return notify('Documento, terceiro, datas e valor são obrigatórios.',true);
+  db.titles.push({id:uid(),companyId:active,partyId:party.id,type:v('type'),document:v('document'),date:v('date'),dueDate:v('dueDate'),amount,payments:[]});
+ }
+ if(kind==='settle'){
+  const titleRec=scoped('titles').find(t=>t.id===id),amount=cents(v('amount'));
+  if(!titleRec||!dateISO(v('date'))||!amount||amount<=0)return notify('Informe uma data e valor positivo.',true);
+  if(v('date')<titleRec.date)return notify('A baixa não pode anteceder a emissão.',true);
+  const paid=titleRec.payments.reduce((s,p)=>s+p.amount,0);
+  if(paid+amount>titleRec.amount)return notify('Baixa maior que o saldo do título.',true);
+  titleRec.payments.push({id:uid(),date:v('date'),amount});
  }
  if(kind==='rule'){
   if(!v('term')||!account(v('accountId')))return notify('Informe a palavra-chave e a conta.',true);

@@ -3,7 +3,11 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const pad=n=>String(n).padStart(2,'0');
 const localToday=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v?.version===1&&['companies','accounts','movements','entries','templates','rules','audit'].every(x=>Array.isArray(v[x])))return {...newDB(),...v}}catch{}return newDB()}
-let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,modal=null,query='',notice='',warning='',stale=false;
+const THEME_KEY=KEY+'.theme';
+let theme=(localStorage.getItem(THEME_KEY)||((window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'));
+if(!['light','dark'].includes(theme))theme='light';
+let focusReturnAction=null;
+let db=load(),active=localStorage.getItem(KEY+'.company')||db.companies[0]?.id||'',period=localStorage.getItem(KEY+'.period')||localToday().slice(0,7),page='dashboard',importing=null,sheet=null,query='',notice='',warning='',stale=false;
 if(!db.companies.some(x=>x.id===active))active=db.companies[0]?.id||'';
 const co=()=>db.companies.find(x=>x.id===active);
 const scoped=k=>db[k].filter(x=>x.companyId===active);
@@ -22,15 +26,17 @@ function save(action,detail){
  db.audit=db.audit.slice(0,700);
  try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{db=load();alert('Falha ao salvar: armazenamento cheio ou bloqueado. Verifique o backup.');return false}
 }
-function go(dest){page=dest;modal=null;query='';render();window.scrollTo(0,0)}
+function go(dest){page=dest;sheet=null;query='';render();window.scrollTo(0,0)}
 const btn=(action,text,kind='')=>'<button type="button" class="btn '+kind+'" data-act="'+action+'">'+text+'</button>';
 const card=(title,body,actions='')=>'<section class="card"><div class="card-head"><h2>'+title+'</h2><div>'+actions+'</div></div>'+body+'</section>';
 function table(headers,rows){return '<div class="table-scroll" tabindex="0" role="region" aria-label="Tabela de dados, navegue horizontalmente se necessário"><table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+headers.length+'" class="muted">Nenhum registro para exibir</td></tr>')+'</tbody></table></div>'}
 function header(title,sub,action=''){return '<div class="heading"><div><p class="overline">'+esc(co()?.name||'AMBIENTE LOCAL')+' / '+esc(period)+'</p><h1>'+title+'</h1><p class="muted">'+sub+'</p></div><div class="inline">'+action+'</div></div>'}
 function layout(content){
  const links=[['dashboard','Visão geral','◫'],['companies','Empresas','▣'],['accounts','Plano de contas','≡'],['parties','Terceiros e títulos','♧'],['import','Importar extrato','⇧'],['movements','Extratos','⇄'],['entries','Lançamentos','▤'],['reconcile','Conciliação','◎'],['reports','Relatórios','▥'],['settings','Backup e regras','⚙']];
- document.getElementById('app').innerHTML='<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a><div class="shell"><aside class="sidebar" aria-label="Menu lateral"><div class="brand"><span class="brand-mark" aria-hidden="true">C</span><div><strong>Contábil Local</strong><small>GESTÃO CONTÁBIL</small></div></div><div class="nav-heading">ESCRITÓRIO</div><nav aria-label="Navegação principal">'+links.map(([id,name,symbol])=>'<button type="button" class="nav-link '+(page===id?'active':'')+'" '+(page===id?'aria-current="page"':'')+' data-page="'+id+'"><span class="nav-icon" aria-hidden="true">'+symbol+'</span>'+name+'</button>').join('')+'</nav><div class="side-foot"><span class="dot" aria-hidden="true"></span> Seus dados ficam neste navegador</div></aside><div class="work"><header class="topbar"><div class="mobile-brand">Contábil Local</div><div class="top-right"><label>Empresa <select id="activeCompany">'+opt(db.companies.map(x=>[x.id,x.name]),active,'Sem empresa')+'</select></label><label>Competência <input id="month" type="month" value="'+esc(period)+'"></label><button class="btn subtle" data-act="backup">Backup JSON</button></div></header><main class="content" id="main-content" tabindex="-1">'+(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')+(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')+content+'<footer>Protótipo de apoio contábil · Não substitui escrituração oficial ou revisão profissional. <span>Dados locais, sem sincronização.</span></footer></main></div></div>'+modalHTML();
- if(modal){const dialog=document.querySelector('[role="dialog"]');const target=dialog?.querySelector('form input:not([type="hidden"]), form select, form button, .icon-btn');target?.focus({preventScroll:true});}
+ document.documentElement.dataset.theme=theme;
+ document.getElementById('app').innerHTML='<a class="skip-link" href="#main-content">Pular para o conteúdo principal</a><div class="shell"><aside class="sidebar" aria-label="Menu lateral"><div class="brand"><span class="brand-mark" aria-hidden="true">C</span><div><strong>Contábil Local</strong><small>GESTÃO CONTÁBIL</small></div></div><div class="nav-heading">ESCRITÓRIO</div><nav aria-label="Navegação principal">'+links.map(([id,name,symbol])=>'<button type="button" class="nav-link '+(page===id?'active':'')+'" '+(page===id?'aria-current="page"':'')+' data-page="'+id+'"><span class="nav-icon" aria-hidden="true">'+symbol+'</span>'+name+'</button>').join('')+'</nav><div class="side-foot"><span class="dot" aria-hidden="true"></span> Seus dados ficam neste navegador</div></aside><div class="work"><header class="topbar"><div class="mobile-brand">Contábil Local</div><div class="top-right"><label>Empresa <select id="activeCompany">'+opt(db.companies.map(x=>[x.id,x.name]),active,'Sem empresa')+'</select></label><label>Competência <input id="month" type="month" value="'+esc(period)+'"></label><div class="theme-toggle" role="group" aria-label="Aparência"><button type="button" data-act="theme-light" aria-pressed="'+(theme==='light')+'">Claro</button><button type="button" data-act="theme-dark" aria-pressed="'+(theme==='dark')+'">Escuro</button></div><button type="button" class="btn subtle" data-act="backup">Backup JSON</button></div></header><main class="content" id="main-content" tabindex="-1">'+(notice?'<div id="feedback" role="status" class="alert '+warning+'">'+esc(notice)+'</div>':'')+(stale?'<div class="alert error">Dados alterados em outra aba. Atualize esta página antes de editar.</div>':'')+content+'<footer>Protótipo de apoio contábil · Não substitui escrituração oficial ou revisão profissional. <span>Dados locais, sem sincronização.</span></footer></main></div></div>'+sheetHTML();
+ document.body.classList.toggle('has-sheet',!!sheet);
+ if(sheet){const dialog=document.querySelector('[role="dialog"]');const target=dialog?.querySelector('form input:not([type="hidden"]), form select, form button, .icon-btn');target?.focus({preventScroll:true});}else if(focusReturnAction){const action=focusReturnAction;focusReturnAction=null;const element=[...document.querySelectorAll('[data-act]')].find(el=>el.dataset.act===action);(element||document.getElementById('main-content'))?.focus({preventScroll:true});}
 }
 function render(){document.title='Contábil Local — Lançamentos e conciliação';if(!co()&&!['companies','settings'].includes(page))return layout('<div class="welcome"><div class="symbol">▣</div><h1>Organize os fechamentos de cada empresa.</h1><p>Cadastre seu primeiro cliente para importar extratos, classificar movimentações e gerar lançamentos contábeis.</p>'+btn('new-company','Cadastrar empresa','primary')+' '+btn('demo','Explorar com dados fictícios','subtle')+'</div>');
  const views={dashboard:dashboard,companies:companies,accounts:accounts,parties:partiesView,import:importView,movements:movements,entries:entries,reconcile:reconcile,reports:reports,settings:settings};
@@ -129,9 +135,9 @@ function settings(){
 }
 function input(name,label,type='text',value='',required=true){return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+(required?'required':'')+'></label>'}
 function pick(name,label,options,required=true){return '<label class="field"><span>'+label+'</span><select name="'+name+'" '+(required?'required':'')+'>'+options+'</select></label>'}
-function modalHTML(){
- if(!modal)return '';
- const {kind,id}=modal,m=bankRows().find(x=>x.id===id),a=ac().find(x=>x.id===id);
+function sheetHTML(){
+ if(!sheet)return '';
+ const {kind,id}=sheet,m=bankRows().find(x=>x.id===id),a=ac().find(x=>x.id===id);
  let title='',body='',help='',action=kind;
  if(kind==='company'){title='Cadastrar empresa';body=input('name','Nome da empresa')+input('document','CNPJ ou identificação','text','',false)}
  if(kind==='account'||kind==='edit-account'){title=kind==='account'?'Nova conta':'Editar conta';body=input('code','Código contábil','text',a?.code||'')+input('name','Nome','text',a?.name||'')+pick('type','Grupo',opt(Object.entries(TYPES),a?.type||'asset','Grupo'))}
@@ -159,7 +165,9 @@ function modalHTML(){
   body=input('date','Data da baixa','date',localToday())+input('amount','Valor pago/recebido (R$)');
  }
  if(kind==='rule'){title='Nova regra de sugestão';body=input('term','Palavra-chave')+pick('accountId','Conta sugerida',accountOptions())}
- return '<div class="modal-layer"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading"><div class="modal-title"><h2 id="modal-heading">'+title+'</h2><button class="icon-btn" type="button" aria-label="Fechar janela" data-act="close">×</button></div>'+help+'<form id="editor" data-kind="'+action+'" data-id="'+esc(id||'')+'"><div class="form-layout pad">'+body+'</div><div class="modal-actions">'+btn('close','Cancelar','outline')+'<button type="submit" class="btn primary">Salvar</button></div></form></div></div>';
+ const descriptions={company:'Cadastre uma empresa e inicie seu plano de contas.',account:'Defina código, descrição e classificação da conta.','edit-account':'Atualize os dados da conta contábil.','manual-bank':'Registre a movimentação da conta bancária.',post:'Confira débito, crédito e contrapartida antes de salvar.','manual-entry':'Informe os dados do lançamento por partidas dobradas.',party:'Identifique o cliente ou fornecedor.',title:'Cadastre o documento e a data de vencimento.',settle:'Registre a baixa no controle auxiliar.',rule:'Defina uma regra de sugestão para os próximos extratos.'};
+ const description=descriptions[kind]||'Preencha e revise as informações.';
+ return '<div class="sheet-layer"><button type="button" class="sheet-backdrop" data-act="close" aria-label="Fechar painel lateral"></button><section class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-heading" aria-describedby="sheet-description"><header class="sheet-header"><div class="sheet-heading"><h2 id="sheet-heading">'+esc(title)+'</h2><p class="sheet-description" id="sheet-description">'+esc(description)+'</p></div><button class="icon-btn" type="button" aria-label="Fechar painel lateral" data-act="close">×</button></header><form id="editor" class="sheet-form" data-kind="'+action+'" data-id="'+esc(id||'')+'"><div class="sheet-scroll">'+help+'<div class="form-layout pad">'+body+'</div></div><div class="sheet-actions">'+btn('close','Cancelar','outline')+'<button type="submit" class="btn primary">Salvar</button></div></form></section></div>';
 }
 function exportFile(name,content,type){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function exportCSV(kind){
@@ -252,18 +260,19 @@ function restore(file){
  }).catch(e=>notify('Backup inválido: '+e.message,true));
 }
 function onAction(action){
- if(action==='close'){modal=null;render();return}
+ if(action==='theme-light'||action==='theme-dark'){theme=action.slice(6);localStorage.setItem(THEME_KEY,theme);render();return}
+ if(action==='close'){sheet=null;render();return}
  if(action==='demo')return seed();
- if(action==='new-company'){modal={kind:'company'};render();return}
- if(action==='new-account'){modal={kind:'account'};render();return}
- if(action==='new-party'){modal={kind:'party'};render();return}
- if(action==='new-title'){if(!scoped('parties').length)return notify('Cadastre um cliente ou fornecedor antes do título.',true);modal={kind:'title'};render();return}
- if(action.startsWith('settle:')){const t=scoped('titles').find(x=>x.id===action.split(':')[1]);if(!t)return;modal={kind:'settle',id:t.id};render();return}
- if(action.startsWith('edit-account:')){modal={kind:'edit-account',id:action.split(':')[1]};render();return}
- if(action==='manual-bank'){modal={kind:'manual-bank'};render();return}
- if(action==='manual-entry'){modal={kind:'manual-entry'};render();return}
- if(action==='new-rule'){modal={kind:'rule'};render();return}
- if(action.startsWith('post:')){const m=bankRows().find(x=>x.id===action.split(':')[1]);if(!m||m.entryId)return notify('Movimento indisponível ou já contabilizado.',true);modal={kind:'post',id:m.id};render();return}
+ if(action==='new-company'){sheet={kind:'company'};render();return}
+ if(action==='new-account'){sheet={kind:'account'};render();return}
+ if(action==='new-party'){sheet={kind:'party'};render();return}
+ if(action==='new-title'){if(!scoped('parties').length)return notify('Cadastre um cliente ou fornecedor antes do título.',true);sheet={kind:'title'};render();return}
+ if(action.startsWith('settle:')){const t=scoped('titles').find(x=>x.id===action.split(':')[1]);if(!t)return;sheet={kind:'settle',id:t.id};render();return}
+ if(action.startsWith('edit-account:')){sheet={kind:'edit-account',id:action.split(':')[1]};render();return}
+ if(action==='manual-bank'){sheet={kind:'manual-bank'};render();return}
+ if(action==='manual-entry'){sheet={kind:'manual-entry'};render();return}
+ if(action==='new-rule'){sheet={kind:'rule'};render();return}
+ if(action.startsWith('post:')){const m=bankRows().find(x=>x.id===action.split(':')[1]);if(!m||m.entryId)return notify('Movimento indisponível ou já contabilizado.',true);sheet={kind:'post',id:m.id};render();return}
  if(action.startsWith('entry:'))return go('entries');
  if(action==='import-page')return go('import');
  if(action==='movements-page')return go('movements');
@@ -346,12 +355,12 @@ function onSave(form){
   if(!v('term')||!account(v('accountId')))return notify('Informe a palavra-chave e a conta.',true);
   db.rules.push({id:uid(),companyId:active,term:v('term').slice(0,100),accountId:v('accountId')});
  }
- if(save(kind,'Registro salvo: '+kind)){modal=null;render();notify('Alteração salva com sucesso.')}
+ if(save(kind,'Registro salvo: '+kind)){sheet=null;render();notify('Alteração salva com sucesso.')}
 }
 document.addEventListener('click',e=>{
  const target=e.target.closest('[data-page],[data-act]');if(!target)return;
  if(target.dataset.page){go(target.dataset.page);return}
- e.preventDefault();onAction(target.dataset.act);
+ e.preventDefault();if(target.dataset.act&&/^(new-|manual-|post:|settle:|edit-account:)/.test(target.dataset.act))focusReturnAction=target.dataset.act;onAction(target.dataset.act);
 });
 document.addEventListener('submit',e=>{if(e.target.id!=='editor')return;e.preventDefault();onSave(e.target)});
 document.addEventListener('change',e=>{
@@ -374,6 +383,6 @@ document.addEventListener('change',e=>{
  }
 });
 document.addEventListener('input',e=>{if(e.target.id!=='query')return;const pos=e.target.selectionStart;query=e.target.value;render();const t=document.getElementById('query');t?.focus();t?.setSelectionRange(pos,pos)});
-document.addEventListener('keydown',event=>{if(!modal)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();modal=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
+document.addEventListener('keydown',event=>{if(!sheet)return;const dialog=document.querySelector('[role="dialog"]');if(!dialog)return;if(event.key==='Escape'){event.preventDefault();sheet=null;render();return}if(event.key!=='Tab')return;const nodes=[...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')].filter(el=>el.getClientRects().length>0);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
 window.addEventListener('storage',e=>{if(e.key===KEY)stale=true});
 render();

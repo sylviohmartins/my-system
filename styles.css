@@ -67,8 +67,8 @@ button, input, select { accent-color: var(--brand); }
 .section { margin-top: var(--space-5); }
 .separator { height: 1px; background: var(--border-soft); margin: var(--space-6) 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.skip-link { position: fixed; top: 8px; left: 8px; z-index: 40; transform: translateY(-150%); background: #fff; color: var(--text); border: 2px solid var(--brand); border-radius: var(--radius-control); padding: var(--space-3); font-weight: 700; }
-.skip-link:focus { transform: translateY(0); }
+.skip-link { position: fixed; top: -120px; left: 8px; z-index: 40; background: #fff; color: var(--text); border: 2px solid var(--brand); border-radius: var(--radius-control); padding: var(--space-3); font-weight: 700; }
+.skip-link:focus { top: 8px; }
 
 /* Shell and primary navigation */
 .shell { min-height: 100vh; }
@@ -256,7 +256,7 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: va
   .heading h1 { font-size: 26px; }
   .heading > div:last-child { width: 100%; }
   .heading .inline { width: 100%; }
-  .metrics, .metrics.compact { grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-3); }
+  .metrics:not(.compact), .metrics.compact { grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-3); }
   .metric { min-height: 132px; padding: var(--space-4); }
   .metric strong { font-size: 22px; }
   .metric:last-child:nth-child(odd) { grid-column: span 2; }

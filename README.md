@@ -29,6 +29,6 @@ Para uso profissional, migrar a IndexedDB/banco de dados corporativo, implantar 
 MIT. Dependências de importação de arquivos são entregues por CDNs externas com versões fixadas; revisar avisos/licenças e política de rede ao distribuir.
 
 ## Ativação do GitHub Pages
-O repositório inclui o workflow .github/workflows/pages.yml que executa os testes antes de publicar os arquivos estáticos. A primeira ativação do Pages pode exigir uma configuração administrativa: Settings → Pages → Build and deployment → Source → GitHub Actions. Depois, execute ou reexecute "Publicar demonstração no GitHub Pages" em Actions. A URL esperada é https://sylviohmartins.github.io/my-system/ **somente após a publicação ser confirmada**.
+O repositório inclui o workflow .github/workflows/pages.yml que executa os testes antes de publicar os arquivos estáticos. O GitHub Pages foi ativado administrativamente via Desktop Commander em 16/11/2026 (horário de São Paulo), com `build_type=workflow`. O workflow `.github/workflows/pages.yml` publica a demonstração ao receber um push na branch `main`. Endereço configurado: https://sylviohmartins.github.io/my-system/ . A URL só deve ser considerada operacional após o resultado positivo do deployment e um teste HTTP.
 
 **Privacidade:** não publique extratos, backups, dados de clientes, CPFs, CNPJs reais ou segredos no repositório público. GitHub Pages hospeda o código da aplicação, não os dados locais de quem a usa.
